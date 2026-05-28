@@ -6,9 +6,19 @@ let categories = [];
 function el(id) { return document.getElementById(id); }
 function money(v) { return Number(v || 0).toLocaleString("vi-VN"); }
 
-function isIncomeRow(r) { return String(r.TypeCode || "").toLowerCase() === "income"; }
-function typeBadge(r) { return r.TypeName || r.TypeCode || ""; }
-function signedAmount(r) { return money(r.Amount); }
+function isIncomeRow(r) {
+  return String(r.TypeCode || "").toLowerCase() === "income" || String(r.TypeName || "").toLowerCase().indexOf("thu") >= 0;
+}
+function typeBadge(r) {
+  return isIncomeRow(r)
+    ? '<span class="badge badge-income">Thu</span>'
+    : '<span class="badge badge-expense">Chi</span>';
+}
+function signedAmount(r) {
+  const value = Number(r.Amount || 0);
+  if (isIncomeRow(r)) return '<span class="amount-income">+ ' + money(value) + '</span>';
+  return '<span class="amount-expense">- ' + money(value) + '</span>';
+}
 
 function formatDate(v) {
   if (!v) return "";

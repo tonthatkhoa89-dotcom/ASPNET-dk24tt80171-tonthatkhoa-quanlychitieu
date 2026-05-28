@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Quản lý thu chi cá nhân</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="assets/style.css" rel="stylesheet">
+</head>
+<body>
+  <div id="loginView" class="login-box">
+    <h1>Quản lý thu chi</h1>
+    <p class="muted">Đăng nhập để sử dụng hệ thống</p>
+    <label>Tài khoản</label>
+    <input id="loginUsername" value="admin">
+    <label>Mật khẩu</label>
+    <input id="loginPassword" type="password" value="admin123">
+    <button onclick="login()">Đăng nhập</button>
+    <div id="loginMessage" class="message"></div>
+  </div>
+
+  <div id="appView" class="app hidden">
+    <aside>
+      <h2>Thu chi</h2>
+      <button class="nav active" onclick="showTab('transactions')">Giao dịch</button>
+      <button class="logout" onclick="logout()">Đăng xuất</button>
+    </aside>
+
+    <main>
+      <section id="transactions" class="tab">
+        <h1>Quản lý giao dịch</h1>
+        <div class="grid form-grid">
+          <input type="hidden" id="transactionId">
+          <label>Ngày<input id="transactionDate" type="date"></label>
+          <label>Loại<select id="transactionType" onchange="fillCategorySelect('transactionCategory', this.value)"></select></label>
+          <label>Danh mục<select id="transactionCategory"></select></label>
+          <label>Số tiền<input id="transactionAmount" type="number" min="0" step="1000"></label>
+          <label>Ghi chú<input id="transactionNote"></label>
+        </div>
+        <div class="actions">
+          <button onclick="saveTransaction()">Lưu</button>
+          <button class="secondary" onclick="clearTransactionForm()">Nhập mới</button>
+        </div>
+
+        <h2>Tìm kiếm, lọc</h2>
+        <div class="grid filter-grid">
+          <label>Từ ngày<input id="filterFrom" type="date"></label>
+          <label>Đến ngày<input id="filterTo" type="date"></label>
+          <label>Loại<select id="filterType" onchange="fillCategorySelect('filterCategory', this.value, true)"></select></label>
+          <label>Danh mục<select id="filterCategory"></select></label>
+          <label>Từ khóa<input id="filterKeyword" placeholder="ghi chú"></label>
+        </div>
+        <div class="actions">
+          <button onclick="loadTransactions()">Lọc</button>
+          <button class="secondary" onclick="resetFilters()">Xóa lọc</button>
+        </div>
+        <div id="transactionTable"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>

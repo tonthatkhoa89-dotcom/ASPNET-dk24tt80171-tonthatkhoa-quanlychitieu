@@ -1,0 +1,188 @@
+* { box-sizing: border-box; }
+body { margin:0; font-family: Arial, sans-serif; background:#f4f6f8; color:#222; }
+.hidden { display:none !important; }
+.login-box { width:360px; margin:80px auto; padding:24px; background:white; border-radius:10px; box-shadow:0 2px 12px #0002; }
+.login-box h1 { margin-top:0; }
+label { display:flex; flex-direction:column; gap:6px; font-weight:600; }
+input, select { padding:10px; border:1px solid #ccd1d5; border-radius:6px; font-size:14px; }
+button { padding:10px 14px; border:0; border-radius:6px; background:#2563eb; color:white; cursor:pointer; font-weight:700; }
+button:hover { opacity:.92; }
+button.secondary { background:#64748b; }
+button.danger { background:#dc2626; }
+button.logout { background:#0f172a; margin-top:18px; width:100%; }
+.message { margin-top:12px; color:#dc2626; }
+.muted { color:#6b7280; }
+
+.app { display:flex; min-height:100vh; }
+aside { width:220px; background:#111827; color:white; padding:20px; }
+aside h2 { margin-top:0; }
+.nav { width:100%; margin:5px 0; text-align:left; background:#1f2937; }
+.nav.active { background:#2563eb; }
+main { flex:1; padding:24px; overflow:auto; }
+section { background:white; padding:22px; border-radius:10px; box-shadow:0 1px 8px #0001; }
+.grid { display:grid; gap:14px; margin-bottom:14px; }
+.form-grid { grid-template-columns: repeat(3, minmax(180px, 1fr)); }
+.filter-grid { grid-template-columns: repeat(5, minmax(140px, 1fr)); }
+.actions { margin:10px 0 20px; display:flex; gap:10px; }
+table { width:100%; border-collapse:collapse; margin-top:12px; }
+th, td { padding:10px; border-bottom:1px solid #e5e7eb; text-align:left; }
+th { background:#f8fafc; }
+.cards { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:22px; }
+.card { padding:18px; background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; }
+.card span { display:block; color:#64748b; }
+.card strong { font-size:24px; display:block; margin-top:8px; }
+canvas { max-width:100%; border:1px solid #e5e7eb; border-radius:8px; background:white; margin-bottom:20px; }
+@media(max-width:900px) {
+  .app { flex-direction:column; }
+  aside { width:100%; }
+  .form-grid, .filter-grid, .cards { grid-template-columns:1fr; }
+}
+
+
+/* v4: màu hiển thị thu / chi */
+.amount-income,
+.text-income {
+  color: #15803d;
+  font-weight: 700;
+}
+
+.amount-expense,
+.text-expense {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.badge {
+  display: inline-block;
+  min-width: 72px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.badge-income {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.badge-expense {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+.card-income {
+  border-left: 6px solid #16a34a;
+}
+
+.card-expense {
+  border-left: 6px solid #dc2626;
+}
+
+.card-balance-positive {
+  border-left: 6px solid #16a34a;
+}
+
+.card-balance-negative {
+  border-left: 6px solid #dc2626;
+}
+
+
+/* v5: gộp thống kê vào tab Giao dịch */
+.inline-statistics {
+  margin: 18px 0 26px;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fbfdff;
+}
+
+.inline-statistics h2 {
+  margin-top: 0;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.chart-grid h2 {
+  margin-top: 18px;
+}
+
+@media(min-width:1200px) {
+  .chart-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+
+/* v6: nút chọn biểu đồ ngày / tháng / năm */
+.chart-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 6px 0 16px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.chart-toolbar span {
+  font-weight: 700;
+  color: #334155;
+}
+
+button.period {
+  background: #64748b;
+}
+
+button.period.active {
+  background: #2563eb;
+}
+
+
+/* v7: Tiết kiệm và biểu đồ tròn */
+.amount-saving,
+.text-saving {
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.badge-saving {
+  background: #dbeafe;
+  color: #2563eb;
+  border: 1px solid #93c5fd;
+}
+
+.card-saving {
+  border-left: 6px solid #2563eb;
+}
+
+.cards-four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.pie-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media(min-width:1200px) {
+  .pie-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media(max-width:900px) {
+  .cards-four {
+    grid-template-columns: 1fr;
+  }
+}

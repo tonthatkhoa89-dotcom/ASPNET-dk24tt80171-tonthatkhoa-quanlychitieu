@@ -1,7 +1,7 @@
 const API_BASE = "../backend/api";
 let types = [];
 let categories = [];
-
+let currentChartPeriod = 'day';
 
 function el(id) { return document.getElementById(id); }
 function money(v) { return Number(v || 0).toLocaleString("vi-VN"); }
@@ -66,7 +66,7 @@ async function initData() {
   await loadCategories();
   fillAllSelects();
   await loadTransactions();
-  
+  await loadStatistics();
 }
 
 function showTab(id) {
@@ -120,7 +120,7 @@ function getFilters() {
 async function loadTransactions() {
   const res = await api("transactions.ashx?" + getFilters());
   renderTransactions(res.data);
-  
+  await loadStatistics();
 }
 
 function renderTransactions(rows) {
@@ -198,7 +198,129 @@ function resetFilters() {
   loadTransactions();
 }
 
-async function loadStatistics() {}
+
+function setChartPeriod(period) {
+  currentChartPeriod = period;
+  document.querySelectorAll(".period").forEach(b => b.classList.remove("active"));
+  const btn = el("btnPeriod" + period.charAt(0).toUpperCase() + period.slice(1));
+  if (btn) btn.classList.add("active");
+  loadStatistics();
+}
+
+function statisticsQuery() {
+  const q = new URLSearchParams(getFilters());
+  q.set("period", currentChartPeriod);
+  return q.toString();
+}
+
+async function loadStatistics() {
+  try {
+    const res = await api("statistics.ashx?" + statisticsQuery());
+    const income = Number(res.summary.totalIncome || 0);
+    const expense = Number(res.summary.totalExpense || 0);
+    const balance = Number(res.summary.balance || 0);
+
+    el("totalIncome").innerHTML = '<span class="text-income">+ ' + money(income) + '</span>';
+    el("totalExpense").innerHTML = '<span class="text-expense">- ' + money(expense) + '</span>';
+    el("balance").innerHTML = balance >= 0
+      ? '<span class="text-income">+ ' + money(balance) + '</span>'
+      : '<span class="text-expense">- ' + money(Math.abs(balance)) + '</span>';
+
+    drawBarChart("categoryChart", res.expenseByCategory || [], "CategoryName", "TotalAmount", "Chi theo danh mục", "expense");
+    drawPeriodChart("monthChart", res.byPeriod || [], currentChartPeriod);
+  } catch (e) {
+    el("totalIncome").innerText = "Lỗi";
+    el("totalExpense").innerText = "Lỗi";
+    el("balance").innerText = "Lỗi";
+    drawText("categoryChart", "Không tải được dữ liệu thống kê: " + e.message);
+    drawText("monthChart", "Không tải được dữ liệu thống kê: " + e.message);
+  }
+}
+
+function drawText(canvasId, text) {
+  const canvas = el(canvasId), ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.font = "16px Arial";
+  ctx.fillText(text, 20, 40);
+}
+
+function drawBarChart(canvasId, rows, labelField, valueField, title, mode) {
+  const canvas = el(canvasId), ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.font = "16px Arial";
+  ctx.fillStyle = "#111827";
+  ctx.fillText(title, 20, 28);
+  if (!rows.length) {
+    ctx.fillStyle = "#64748b";
+    ctx.fillText("Không có dữ liệu", 20, 70);
+    return;
+  }
+  const max = Math.max(...rows.map(r => Number(r[valueField])));
+  const barW = Math.max(28, (canvas.width - 80) / rows.length - 16);
+  rows.forEach((r,i) => {
+    const value = Number(r[valueField]);
+    const h = max ? value / max * 210 : 0;
+    const x = 50 + i * (barW + 16);
+    const y = 270 - h;
+    ctx.fillStyle = "#dc2626";
+    ctx.fillRect(x, y, barW, h);
+    ctx.fillStyle = "#111827";
+    ctx.fillText(money(value), x, Math.max(48, y - 6));
+    ctx.save();
+    ctx.translate(x, 292);
+    ctx.rotate(-0.5);
+    ctx.fillText(String(r[labelField]).substring(0,14), 0, 0);
+    ctx.restore();
+  });
+}
+
+function drawPeriodChart(canvasId, rows, period) {
+  const canvas = el(canvasId), ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const title = period === "day" ? "Thu / Chi theo 7 ngày gần nhất"
+    : period === "year" ? "Thu / Chi theo 3 năm gần nhất"
+    : "Thu / Chi theo 12 tháng gần nhất";
+  const titleNode = el("periodChartTitle");
+  if (titleNode) titleNode.innerText = title;
+  ctx.font = "16px Arial";
+  ctx.fillStyle = "#111827";
+  ctx.fillText(title, 20, 28);
+  ctx.font = "14px Arial";
+  ctx.fillStyle = "#16a34a";
+  ctx.fillRect(20, 44, 14, 14);
+  ctx.fillStyle = "#111827";
+  ctx.fillText("Thu nhập", 40, 56);
+  ctx.fillStyle = "#dc2626";
+  ctx.fillRect(130, 44, 14, 14);
+  ctx.fillStyle = "#111827";
+  ctx.fillText("Chi tiêu", 150, 56);
+  if (!rows.length) {
+    ctx.fillStyle = "#64748b";
+    ctx.fillText("Không có dữ liệu", 20, 90);
+    return;
+  }
+  const max = Math.max(1, ...rows.flatMap(r => [Number(r.IncomeAmount || 0), Number(r.ExpenseAmount || 0)]));
+  const groupW = Math.max(38, (canvas.width - 90) / rows.length - 10);
+  rows.forEach((r,i) => {
+    const x = 45 + i * (groupW + 10);
+    const inc = Number(r.IncomeAmount || 0);
+    const exp = Number(r.ExpenseAmount || 0);
+    const incH = inc / max * 180;
+    const expH = exp / max * 180;
+    ctx.fillStyle = "#16a34a";
+    ctx.fillRect(x, 270 - incH, groupW/2 - 2, incH);
+    ctx.fillStyle = "#dc2626";
+    ctx.fillRect(x + groupW/2 + 2, 270 - expH, groupW/2 - 2, expH);
+    ctx.fillStyle = "#111827";
+    ctx.font = "12px Arial";
+    const label = r.PeriodLabel || r.PeriodKey || "";
+    ctx.save();
+    ctx.translate(x, 292);
+    if (period === "month") ctx.rotate(-0.45);
+    ctx.fillText(label, 0, 0);
+    ctx.restore();
+  });
+}
 
 
 (async function checkLogin() {

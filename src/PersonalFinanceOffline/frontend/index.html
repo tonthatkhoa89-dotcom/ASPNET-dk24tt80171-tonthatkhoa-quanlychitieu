@@ -53,6 +53,34 @@
           <button onclick="loadTransactions()">Lọc</button>
           <button class="secondary" onclick="resetFilters()">Xóa lọc</button>
         </div>
+
+        <div class="inline-statistics">
+          <h2>Thống kê tài chính</h2>
+          <div class="cards">
+            <div class="card"><span>Tổng thu</span><strong id="totalIncome">0</strong></div>
+            <div class="card"><span>Tổng chi</span><strong id="totalExpense">0</strong></div>
+            <div class="card"><span>Số dư</span><strong id="balance">0</strong></div>
+          </div>
+
+          <div class="chart-toolbar">
+            <span>Biểu đồ thu / chi:</span>
+            <button id="btnPeriodDay" class="period active" onclick="setChartPeriod('day')">Ngày</button>
+            <button id="btnPeriodMonth" class="period" onclick="setChartPeriod('month')">Tháng</button>
+            <button id="btnPeriodYear" class="period" onclick="setChartPeriod('year')">Năm</button>
+          </div>
+
+          <div class="chart-grid">
+            <div>
+              <h2>Tỷ lệ chi tiêu theo danh mục</h2>
+              <canvas id="categoryChart" width="760" height="320"></canvas>
+            </div>
+            <div>
+              <h2 id="periodChartTitle">Thu / Chi theo 7 ngày gần nhất</h2>
+              <canvas id="monthChart" width="760" height="320"></canvas>
+            </div>
+          </div>
+        </div>
+
         <div id="transactionTable"></div>
       </section>
     </main>

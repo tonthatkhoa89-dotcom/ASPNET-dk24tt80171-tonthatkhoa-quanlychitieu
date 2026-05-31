@@ -5,21 +5,23 @@ let currentChartPeriod = 'day';
 
 function el(id) { return document.getElementById(id); }
 function money(v) { return Number(v || 0).toLocaleString("vi-VN"); }
-
 function isIncomeRow(r) {
   return String(r.TypeCode || "").toLowerCase() === "income" || String(r.TypeName || "").toLowerCase().indexOf("thu") >= 0;
 }
+function isSavingRow(r) {
+  return String(r.TypeCode || "").toLowerCase() === "saving" || String(r.TypeName || "").toLowerCase().indexOf("tiết") >= 0;
+}
 function typeBadge(r) {
-  return isIncomeRow(r)
-    ? '<span class="badge badge-income">Thu</span>'
-    : '<span class="badge badge-expense">Chi</span>';
+  if (isIncomeRow(r)) return '<span class="badge badge-income">Thu</span>';
+  if (isSavingRow(r)) return '<span class="badge badge-saving">Tiết kiệm</span>';
+  return '<span class="badge badge-expense">Chi</span>';
 }
 function signedAmount(r) {
   const value = Number(r.Amount || 0);
   if (isIncomeRow(r)) return '<span class="amount-income">+ ' + money(value) + '</span>';
+  if (isSavingRow(r)) return '<span class="amount-saving">◇ ' + money(value) + '</span>';
   return '<span class="amount-expense">- ' + money(value) + '</span>';
 }
-
 function formatDate(v) {
   if (!v) return "";
   if (typeof v === "string" && v.indexOf("/Date(") === 0) {
@@ -67,30 +69,42 @@ async function initData() {
   fillAllSelects();
   await loadTransactions();
   await loadStatistics();
+  await loadUsers();
 }
 
 function showTab(id) {
   document.querySelectorAll(".tab").forEach(x => x.classList.add("hidden"));
   document.querySelectorAll(".nav").forEach(x => x.classList.remove("active"));
   el(id).classList.remove("hidden");
-  const nav = [...document.querySelectorAll(".nav")].find(b => b.textContent.toLowerCase().includes("giao"));
+
+  const keyword = id === "transactions" ? "giao"
+    : id === "categories" ? "danh"
+    : id === "types" ? "loại"
+    : "user";
+
+  const nav = [...document.querySelectorAll(".nav")]
+    .find(b => b.textContent.toLowerCase().includes(keyword));
   if (nav) nav.classList.add("active");
+
   if (id === "transactions") loadStatistics();
 }
 
 async function loadTypes() {
   const res = await api("transactionTypes.ashx");
   types = res.data;
+  renderTypes();
 }
 
 async function loadCategories() {
   const res = await api("categories.ashx");
   categories = res.data;
+  renderCategories();
 }
 
 function fillAllSelects() {
   fillTypeSelect("transactionType", false);
   fillTypeSelect("filterType", true);
+  fillTypeSelect("categoryType", false);
   fillCategorySelect("transactionCategory", el("transactionType").value);
   fillCategorySelect("filterCategory", "", true);
 }
@@ -142,7 +156,6 @@ function table(headers, rows) {
 
 async function saveTransaction() {
   const data = {
-    action: "save",
     transactionId: Number(el("transactionId").value || 0),
     transactionDate: el("transactionDate").value,
     typeId: Number(el("transactionType").value),
@@ -154,6 +167,7 @@ async function saveTransaction() {
     alert("Vui lòng nhập đủ ngày, loại, danh mục và số tiền > 0.");
     return;
   }
+  data.action = "save";
   await api("transactions.ashx", {
     method: "POST",
     body: JSON.stringify(data)
@@ -218,21 +232,38 @@ async function loadStatistics() {
     const res = await api("statistics.ashx?" + statisticsQuery());
     const income = Number(res.summary.totalIncome || 0);
     const expense = Number(res.summary.totalExpense || 0);
+    const saving = Number(res.summary.totalSaving || 0);
     const balance = Number(res.summary.balance || 0);
 
     el("totalIncome").innerHTML = '<span class="text-income">+ ' + money(income) + '</span>';
     el("totalExpense").innerHTML = '<span class="text-expense">- ' + money(expense) + '</span>';
+    el("totalSaving").innerHTML = '<span class="text-saving">◇ ' + money(saving) + '</span>';
     el("balance").innerHTML = balance >= 0
       ? '<span class="text-income">+ ' + money(balance) + '</span>'
       : '<span class="text-expense">- ' + money(Math.abs(balance)) + '</span>';
 
-    drawBarChart("categoryChart", res.expenseByCategory || [], "CategoryName", "TotalAmount", "Chi theo danh mục", "expense");
+    const incomeCard = el("totalIncome").closest(".card");
+    const expenseCard = el("totalExpense").closest(".card");
+    const savingCard = el("totalSaving").closest(".card");
+    const balanceCard = el("balance").closest(".card");
+    incomeCard.classList.add("card-income");
+    expenseCard.classList.add("card-expense");
+    savingCard.classList.add("card-saving");
+    balanceCard.classList.remove("card-balance-positive", "card-balance-negative");
+    balanceCard.classList.add(balance >= 0 ? "card-balance-positive" : "card-balance-negative");
+
+    drawPieChart("expensePieChart", res.expenseByCategory || [], "Chi tiêu theo danh mục", "expense");
+    drawPieChart("incomePieChart", res.incomeByCategory || [], "Thu nhập theo danh mục", "income");
+    drawPieChart("savingPieChart", res.savingByCategory || [], "Tiết kiệm theo danh mục", "saving");
     drawPeriodChart("monthChart", res.byPeriod || [], currentChartPeriod);
   } catch (e) {
     el("totalIncome").innerText = "Lỗi";
     el("totalExpense").innerText = "Lỗi";
+    if (el("totalSaving")) el("totalSaving").innerText = "Lỗi";
     el("balance").innerText = "Lỗi";
-    drawText("categoryChart", "Không tải được dữ liệu thống kê: " + e.message);
+    drawText("expensePieChart", "Không tải được dữ liệu thống kê: " + e.message);
+    drawText("incomePieChart", "Không tải được dữ liệu thống kê: " + e.message);
+    drawText("savingPieChart", "Không tải được dữ liệu thống kê: " + e.message);
     drawText("monthChart", "Không tải được dữ liệu thống kê: " + e.message);
   }
 }
@@ -244,73 +275,128 @@ function drawText(canvasId, text) {
   ctx.fillText(text, 20, 40);
 }
 
-function drawBarChart(canvasId, rows, labelField, valueField, title, mode) {
+function pieColors(mode) {
+  if (mode === "income") return ["#16a34a", "#22c55e", "#86efac", "#15803d", "#bbf7d0", "#4ade80"];
+  if (mode === "saving") return ["#2563eb", "#60a5fa", "#93c5fd", "#1d4ed8", "#bfdbfe", "#3b82f6"];
+  return ["#dc2626", "#ef4444", "#fca5a5", "#b91c1c", "#fecaca", "#f87171"];
+}
+
+function drawPieChart(canvasId, rows, title, mode) {
   const canvas = el(canvasId), ctx = canvas.getContext("2d");
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.font = "16px Arial";
   ctx.fillStyle = "#111827";
   ctx.fillText(title, 20, 28);
-  if (!rows.length) {
+
+  const total = rows.reduce((s, r) => s + Number(r.TotalAmount || 0), 0);
+  if (!rows.length || total <= 0) {
     ctx.fillStyle = "#64748b";
     ctx.fillText("Không có dữ liệu", 20, 70);
     return;
   }
-  const max = Math.max(...rows.map(r => Number(r[valueField])));
-  const barW = Math.max(28, (canvas.width - 80) / rows.length - 16);
-  rows.forEach((r,i) => {
-    const value = Number(r[valueField]);
-    const h = max ? value / max * 210 : 0;
-    const x = 50 + i * (barW + 16);
-    const y = 270 - h;
-    ctx.fillStyle = "#dc2626";
-    ctx.fillRect(x, y, barW, h);
+
+  const colors = pieColors(mode);
+  const cx = 150;
+  const cy = 175;
+  const radius = 105;
+  let startAngle = -Math.PI / 2;
+
+  rows.forEach((r, i) => {
+    const value = Number(r.TotalAmount || 0);
+    const angle = value / total * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, startAngle, startAngle + angle);
+    ctx.closePath();
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+    startAngle += angle;
+  });
+
+  let legendX = 300;
+  let legendY = 70;
+  ctx.font = "14px Arial";
+  rows.forEach((r, i) => {
+    const value = Number(r.TotalAmount || 0);
+    const pct = total ? value / total * 100 : 0;
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillRect(legendX, legendY - 12, 14, 14);
     ctx.fillStyle = "#111827";
-    ctx.fillText(money(value), x, Math.max(48, y - 6));
-    ctx.save();
-    ctx.translate(x, 292);
-    ctx.rotate(-0.5);
-    ctx.fillText(String(r[labelField]).substring(0,14), 0, 0);
-    ctx.restore();
+    ctx.fillText(
+      String(r.CategoryName).substring(0, 18) + ": " + pct.toFixed(1) + "% (" + money(value) + ")",
+      legendX + 22,
+      legendY
+    );
+    legendY += 24;
   });
 }
+
 
 function drawPeriodChart(canvasId, rows, period) {
   const canvas = el(canvasId), ctx = canvas.getContext("2d");
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  const title = period === "day" ? "Thu / Chi theo 7 ngày gần nhất"
-    : period === "year" ? "Thu / Chi theo 3 năm gần nhất"
-    : "Thu / Chi theo 12 tháng gần nhất";
+
+  const title = period === "day"
+    ? "Thu / Chi / Tiết kiệm theo 7 ngày gần nhất"
+    : period === "year"
+      ? "Thu / Chi / Tiết kiệm theo 3 năm gần nhất"
+      : "Thu / Chi / Tiết kiệm theo 12 tháng gần nhất";
+
   const titleNode = el("periodChartTitle");
   if (titleNode) titleNode.innerText = title;
+
   ctx.font = "16px Arial";
   ctx.fillStyle = "#111827";
   ctx.fillText(title, 20, 28);
+
   ctx.font = "14px Arial";
   ctx.fillStyle = "#16a34a";
   ctx.fillRect(20, 44, 14, 14);
   ctx.fillStyle = "#111827";
   ctx.fillText("Thu nhập", 40, 56);
+
   ctx.fillStyle = "#dc2626";
   ctx.fillRect(130, 44, 14, 14);
   ctx.fillStyle = "#111827";
   ctx.fillText("Chi tiêu", 150, 56);
+
+  ctx.fillStyle = "#2563eb";
+  ctx.fillRect(230, 44, 14, 14);
+  ctx.fillStyle = "#111827";
+  ctx.fillText("Tiết kiệm", 250, 56);
+
   if (!rows.length) {
     ctx.fillStyle = "#64748b";
     ctx.fillText("Không có dữ liệu", 20, 90);
     return;
   }
-  const max = Math.max(1, ...rows.flatMap(r => [Number(r.IncomeAmount || 0), Number(r.ExpenseAmount || 0)]));
-  const groupW = Math.max(38, (canvas.width - 90) / rows.length - 10);
+
+  const max = Math.max(1, ...rows.flatMap(r => [
+    Number(r.IncomeAmount || 0),
+    Number(r.ExpenseAmount || 0),
+    Number(r.SavingAmount || 0)
+  ]));
+  const groupW = Math.max(45, (canvas.width - 90) / rows.length - 10);
+  const barW = Math.max(8, groupW / 3 - 3);
+
   rows.forEach((r,i) => {
     const x = 45 + i * (groupW + 10);
     const inc = Number(r.IncomeAmount || 0);
     const exp = Number(r.ExpenseAmount || 0);
+    const sav = Number(r.SavingAmount || 0);
     const incH = inc / max * 180;
     const expH = exp / max * 180;
+    const savH = sav / max * 180;
+
     ctx.fillStyle = "#16a34a";
-    ctx.fillRect(x, 270 - incH, groupW/2 - 2, incH);
+    ctx.fillRect(x, 270 - incH, barW, incH);
+
     ctx.fillStyle = "#dc2626";
-    ctx.fillRect(x + groupW/2 + 2, 270 - expH, groupW/2 - 2, expH);
+    ctx.fillRect(x + barW + 3, 270 - expH, barW, expH);
+
+    ctx.fillStyle = "#2563eb";
+    ctx.fillRect(x + (barW + 3) * 2, 270 - savH, barW, savH);
+
     ctx.fillStyle = "#111827";
     ctx.font = "12px Arial";
     const label = r.PeriodLabel || r.PeriodKey || "";
@@ -319,9 +405,153 @@ function drawPeriodChart(canvasId, rows, period) {
     if (period === "month") ctx.rotate(-0.45);
     ctx.fillText(label, 0, 0);
     ctx.restore();
+
+    if (period === "year") {
+      ctx.fillStyle = "#16a34a";
+      ctx.fillText(money(inc), x, Math.max(78, 270 - incH - 6));
+      ctx.fillStyle = "#dc2626";
+      ctx.fillText(money(exp), x + barW + 3, Math.max(92, 270 - expH - 6));
+      ctx.fillStyle = "#2563eb";
+      ctx.fillText(money(sav), x + (barW + 3) * 2, Math.max(106, 270 - savH - 6));
+    }
   });
 }
 
+function renderCategories() {
+  el("categoryTable").innerHTML = table(["Loại","Danh mục","Hoạt động",""], categories.map(c => [
+    c.TypeName, c.CategoryName, c.IsActive ? "Có" : "Không",
+    `<button onclick='editCategory(${JSON.stringify(c)})'>Sửa</button>
+     <button class="danger" onclick="deleteCategory(${c.CategoryId})">Xóa</button>`
+  ]));
+}
+
+async function saveCategory() {
+  const data = {
+    categoryId: Number(el("categoryId").value || 0),
+    typeId: Number(el("categoryType").value),
+    categoryName: el("categoryName").value,
+    isActive: Number(el("categoryActive").value)
+  };
+  data.action = "save";
+  await api("categories.ashx", { method: "POST", body: JSON.stringify(data) });
+  clearCategoryForm();
+  await loadCategories();
+  fillAllSelects();
+}
+
+function editCategory(c) {
+  el("categoryId").value = c.CategoryId;
+  el("categoryType").value = c.TypeId;
+  el("categoryName").value = c.CategoryName;
+  el("categoryActive").value = c.IsActive ? "1" : "0";
+}
+
+async function deleteCategory(id) {
+  if (!confirm("Xóa danh mục này?")) return;
+  await api("categories.ashx", {
+    method: "POST",
+    body: JSON.stringify({ action: "delete", categoryId: id })
+  });
+  await loadCategories();
+  fillAllSelects();
+}
+
+function clearCategoryForm() {
+  el("categoryId").value = "";
+  el("categoryName").value = "";
+  el("categoryActive").value = "1";
+}
+
+function renderTypes() {
+  el("typeTable").innerHTML = table(["Mã","Tên",""], types.map(t => [
+    t.TypeCode, t.TypeName,
+    `<button onclick='editType(${JSON.stringify(t)})'>Sửa</button>
+     <button class="danger" onclick="deleteType(${t.TypeId})">Xóa</button>`
+  ]));
+}
+
+async function saveType() {
+  const data = {
+    typeId: Number(el("typeId").value || 0),
+    typeCode: el("typeCode").value,
+    typeName: el("typeName").value
+  };
+  data.action = "save";
+  await api("transactionTypes.ashx", { method: "POST", body: JSON.stringify(data) });
+  clearTypeForm();
+  await loadTypes();
+  fillAllSelects();
+}
+
+function editType(t) {
+  el("typeId").value = t.TypeId;
+  el("typeCode").value = t.TypeCode;
+  el("typeName").value = t.TypeName;
+}
+
+async function deleteType(id) {
+  if (!confirm("Xóa loại này?")) return;
+  await api("transactionTypes.ashx", {
+    method: "POST",
+    body: JSON.stringify({ action: "delete", typeId: id })
+  });
+  await loadTypes();
+  fillAllSelects();
+}
+
+function clearTypeForm() {
+  el("typeId").value = "";
+  el("typeCode").value = "";
+  el("typeName").value = "";
+}
+
+async function loadUsers() {
+  const res = await api("users.ashx");
+  el("userTable").innerHTML = table(["Tài khoản","Họ tên","Hoạt động",""], res.data.map(u => [
+    u.Username, u.FullName || "", u.IsActive ? "Có" : "Không",
+    `<button onclick='editUser(${JSON.stringify(u)})'>Sửa</button>
+     <button class="danger" onclick="deleteUser(${u.UserId})">Xóa</button>`
+  ]));
+}
+
+async function saveUser() {
+  const data = {
+    userId: Number(el("userId").value || 0),
+    username: el("username").value,
+    fullName: el("fullName").value,
+    password: el("password").value,
+    isActive: Number(el("userActive").value)
+  };
+  data.action = "save";
+  await api("users.ashx", { method: "POST", body: JSON.stringify(data) });
+  clearUserForm();
+  await loadUsers();
+}
+
+function editUser(u) {
+  el("userId").value = u.UserId;
+  el("username").value = u.Username;
+  el("fullName").value = u.FullName || "";
+  el("password").value = "";
+  el("userActive").value = u.IsActive ? "1" : "0";
+}
+
+async function deleteUser(id) {
+  if (!confirm("Xóa user này?")) return;
+  await api("users.ashx", {
+    method: "POST",
+    body: JSON.stringify({ action: "delete", userId: id })
+  });
+  await loadUsers();
+}
+
+function clearUserForm() {
+  el("userId").value = "";
+  el("username").value = "";
+  el("fullName").value = "";
+  el("password").value = "";
+  el("userActive").value = "1";
+}
 
 (async function checkLogin() {
   try {

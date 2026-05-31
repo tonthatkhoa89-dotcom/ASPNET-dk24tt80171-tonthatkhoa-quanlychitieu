@@ -22,6 +22,9 @@
     <aside>
       <h2>Thu chi</h2>
       <button class="nav active" onclick="showTab('transactions')">Giao dịch</button>
+      <button class="nav" onclick="showTab('categories')">Danh mục</button>
+      <button class="nav" onclick="showTab('types')">Loại thu/chi</button>
+      <button class="nav" onclick="showTab('users')">User</button>
       <button class="logout" onclick="logout()">Đăng xuất</button>
     </aside>
 
@@ -56,10 +59,11 @@
 
         <div class="inline-statistics">
           <h2>Thống kê tài chính</h2>
-          <div class="cards">
+          <div class="cards cards-four">
             <div class="card"><span>Tổng thu</span><strong id="totalIncome">0</strong></div>
             <div class="card"><span>Tổng chi</span><strong id="totalExpense">0</strong></div>
-            <div class="card"><span>Số dư</span><strong id="balance">0</strong></div>
+            <div class="card"><span>Tổng tiết kiệm</span><strong id="totalSaving">0</strong></div>
+            <div class="card"><span>Số dư khả dụng</span><strong id="balance">0</strong></div>
           </div>
 
           <div class="chart-toolbar">
@@ -69,19 +73,75 @@
             <button id="btnPeriodYear" class="period" onclick="setChartPeriod('year')">Năm</button>
           </div>
 
-          <div class="chart-grid">
+          <div class="pie-grid">
             <div>
               <h2>Tỷ lệ chi tiêu theo danh mục</h2>
-              <canvas id="categoryChart" width="760" height="320"></canvas>
+              <canvas id="expensePieChart" width="520" height="340"></canvas>
             </div>
             <div>
-              <h2 id="periodChartTitle">Thu / Chi theo 7 ngày gần nhất</h2>
+              <h2>Tỷ lệ thu nhập theo danh mục</h2>
+              <canvas id="incomePieChart" width="520" height="340"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-grid">
+            <div>
+              <h2>Tỷ lệ tiết kiệm theo danh mục</h2>
+              <canvas id="savingPieChart" width="760" height="320"></canvas>
+            </div>
+            <div>
+              <h2 id="periodChartTitle">Thu / Chi / Tiết kiệm theo 7 ngày gần nhất</h2>
               <canvas id="monthChart" width="760" height="320"></canvas>
             </div>
           </div>
         </div>
 
         <div id="transactionTable"></div>
+      </section>
+
+      <section id="categories" class="tab hidden">
+        <h1>Quản lý danh mục</h1>
+        <div class="grid form-grid">
+          <input type="hidden" id="categoryId">
+          <label>Loại<select id="categoryType"></select></label>
+          <label>Tên danh mục<input id="categoryName"></label>
+          <label>Hoạt động<select id="categoryActive"><option value="1">Có</option><option value="0">Không</option></select></label>
+        </div>
+        <div class="actions">
+          <button onclick="saveCategory()">Lưu</button>
+          <button class="secondary" onclick="clearCategoryForm()">Nhập mới</button>
+        </div>
+        <div id="categoryTable"></div>
+      </section>
+
+      <section id="types" class="tab hidden">
+        <h1>Quản lý loại thu/chi</h1>
+        <div class="grid form-grid">
+          <input type="hidden" id="typeId">
+          <label>Mã loại<input id="typeCode" placeholder="Income hoặc Expense"></label>
+          <label>Tên loại<input id="typeName"></label>
+        </div>
+        <div class="actions">
+          <button onclick="saveType()">Lưu</button>
+          <button class="secondary" onclick="clearTypeForm()">Nhập mới</button>
+        </div>
+        <div id="typeTable"></div>
+      </section>
+
+      <section id="users" class="tab hidden">
+        <h1>Quản lý user</h1>
+        <div class="grid form-grid">
+          <input type="hidden" id="userId">
+          <label>Tài khoản<input id="username"></label>
+          <label>Họ tên<input id="fullName"></label>
+          <label>Mật khẩu<input id="password" type="password" placeholder="để trống nếu không đổi"></label>
+          <label>Hoạt động<select id="userActive"><option value="1">Có</option><option value="0">Không</option></select></label>
+        </div>
+        <div class="actions">
+          <button onclick="saveUser()">Lưu</button>
+          <button class="secondary" onclick="clearUserForm()">Nhập mới</button>
+        </div>
+        <div id="userTable"></div>
       </section>
     </main>
   </div>

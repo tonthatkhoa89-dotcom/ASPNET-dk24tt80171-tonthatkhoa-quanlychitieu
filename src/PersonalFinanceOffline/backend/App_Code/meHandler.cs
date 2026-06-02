@@ -1,3 +1,4 @@
+﻿using System;
 using System.Web;
 using System.Web.SessionState;
 
@@ -11,9 +12,16 @@ public class MeHandler : IHttpHandler, IRequiresSessionState
             WebUtil.WriteJson(context, new { ok = false });
             return;
         }
+
+        bool isAdmin = WebUtil.CurrentUserIsAdmin(context);
+
         WebUtil.WriteJson(context, new {
             ok = true,
-            user = new { userId = userId, username = context.Session["Username"] }
+            user = new {
+                userId = userId,
+                username = context.Session["Username"],
+                isAdmin = isAdmin
+            }
         });
     }
 

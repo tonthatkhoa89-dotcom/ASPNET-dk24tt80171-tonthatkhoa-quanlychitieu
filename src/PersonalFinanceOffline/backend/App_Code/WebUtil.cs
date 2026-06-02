@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Security.Cryptography;
@@ -59,7 +59,36 @@ public static class WebUtil
         return decimal.TryParse(S(value), out result) ? result : 0;
     }
 
-    public static string Sha256(string text)
+    
+    public static bool CurrentUserIsAdmin(HttpContext context)
+    {
+        if (context == null || context.Session == null || context.Session["IsAdmin"] == null)
+            return false;
+
+        try
+        {
+            return Convert.ToBoolean(context.Session["IsAdmin"]);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static bool RequireAdmin(HttpContext context)
+    {
+        if (!RequireLogin(context)) return false;
+
+        if (!CurrentUserIsAdmin(context))
+        {
+            WriteError(context, 403, "Tài khoản không có quyền admin.");
+            return false;
+        }
+
+        return true;
+    }
+
+public static string Sha256(string text)
     {
         using (var sha = SHA256.Create())
         {

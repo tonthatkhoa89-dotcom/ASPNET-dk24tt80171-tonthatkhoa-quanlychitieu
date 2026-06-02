@@ -1,4 +1,4 @@
-
+﻿
 using System;
 using System.Data.SqlClient;
 using System.Web;
@@ -20,6 +20,7 @@ public class TransactionTypesHandler : IHttpHandler, IRequiresSessionState
 
         if (method == "POST")
         {
+            if (!WebUtil.RequireAdmin(context)) return;
             var data = WebUtil.ReadJson(context);
             string action = data.ContainsKey("action") ? WebUtil.S(data["action"]).ToLower() : "save";
 

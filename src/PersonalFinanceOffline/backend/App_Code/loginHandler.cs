@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Data.SqlClient;
 using System.Web;
 using System.Web.SessionState;
@@ -19,7 +19,7 @@ public class LoginHandler : IHttpHandler, IRequiresSessionState
         string hash = WebUtil.Sha256(password);
 
         var table = Db.Query(
-            @"SELECT TOP 1 UserId, Username, FullName
+            @"SELECT TOP 1 UserId, Username, FullName, IsAdmin
               FROM Users
               WHERE Username=@Username AND PasswordHash=@PasswordHash AND IsActive=1",
             new SqlParameter("@Username", username),
@@ -33,13 +33,16 @@ public class LoginHandler : IHttpHandler, IRequiresSessionState
 
         context.Session["UserId"] = Convert.ToInt32(table.Rows[0]["UserId"]);
         context.Session["Username"] = table.Rows[0]["Username"].ToString();
+        bool isAdmin = table.Rows[0]["IsAdmin"] != DBNull.Value && Convert.ToBoolean(table.Rows[0]["IsAdmin"]);
+        context.Session["IsAdmin"] = isAdmin;
 
         WebUtil.WriteJson(context, new {
             ok = true,
             user = new {
                 userId = table.Rows[0]["UserId"],
                 username = table.Rows[0]["Username"],
-                fullName = table.Rows[0]["FullName"]
+                fullName = table.Rows[0]["FullName"],
+                isAdmin = isAdmin
             }
         });
     }

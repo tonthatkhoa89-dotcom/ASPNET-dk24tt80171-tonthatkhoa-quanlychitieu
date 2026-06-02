@@ -339,6 +339,7 @@
     <aside>
       <h2>Thu chi</h2>
       <button class="nav active" onclick="showTab('transactions')">Giao dịch</button>
+      <button class="nav" onclick="showTab('savingsGoals')">Kế hoạch tiết kiệm</button>
       <button class="nav" onclick="showTab('categories')">Danh mục</button>
       <button class="nav" onclick="showTab('types')">Loại thu/chi</button>
       <button class="nav" onclick="showTab('users')">User</button>
@@ -433,6 +434,44 @@
 
         <div id="transactionTable"></div>
       </section>
+
+
+      <section id="savingsGoals" class="tab hidden">
+        <h1>Lập kế hoạch tiết kiệm</h1>
+        <p class="muted">Đặt mục tiêu tiết kiệm, theo dõi tiến độ, cảnh báo khi vượt ngân sách và xem gợi ý tiết kiệm cơ bản theo dữ liệu tháng hiện tại.</p>
+
+        <div class="grid form-grid">
+          <input type="hidden" id="goalId">
+          <label>Tên mục tiêu<input id="goalName" placeholder="Ví dụ: Mua laptop, Quỹ dự phòng"></label>
+          <label>Số tiền mục tiêu<input id="goalTargetAmount" type="number" min="0" step="100000" placeholder="Ví dụ: 30000000"></label>
+          <label>Ngân sách chi tiêu/tháng<input id="goalMonthlyBudget" type="number" min="0" step="100000" placeholder="Ví dụ: 8000000"></label>
+          <label>Ngày bắt đầu<input id="goalStartDate" type="date"></label>
+          <label>Ngày đạt mục tiêu<input id="goalTargetDate" type="date"></label>
+          <label>Hoạt động<select id="goalActive"><option value="1">Có</option><option value="0">Không</option></select></label>
+        </div>
+
+        <div class="actions">
+          <button onclick="saveSavingsGoal()">Lưu mục tiêu</button>
+          <button class="secondary" onclick="clearSavingsGoalForm()">Nhập mới</button>
+        </div>
+
+        <div class="goal-summary-grid">
+          <div class="card card-income"><span>Thu tháng này</span><strong id="goalMonthIncome">0</strong></div>
+          <div class="card card-expense"><span>Chi tháng này</span><strong id="goalMonthExpense">0</strong></div>
+          <div class="card card-saving"><span>Tiết kiệm tháng này</span><strong id="goalMonthSaving">0</strong></div>
+          <div class="card"><span>Số dư tháng này</span><strong id="goalMonthBalance">0</strong></div>
+        </div>
+
+        <h2>Cảnh báo ngân sách</h2>
+        <div id="budgetAlerts" class="alert-list"></div>
+
+        <h2>Gợi ý tiết kiệm</h2>
+        <div id="savingRecommendations" class="recommendation-list"></div>
+
+        <h2>Danh sách mục tiêu</h2>
+        <div id="savingsGoalTable"></div>
+      </section>
+
 
       <section id="categories" class="tab hidden">
         <h1>Quản lý danh mục</h1>

@@ -2,6 +2,10 @@ const API_BASE = "../backend/api";
 let types = [];
 let categories = [];
 let currentChartPeriod = 'day';
+let transactionCurrentPage = 1;
+let transactionPageSize = 10;
+let transactionTotalPages = 1;
+let transactionTotalRows = 0;
 
 function el(id) { return document.getElementById(id); }
 function money(v) { return Number(v || 0).toLocaleString("vi-VN"); }
@@ -121,6 +125,38 @@ function fillCategorySelect(id, typeId, all) {
     filtered.map(c => `<option value="${c.CategoryId}">${c.CategoryName}</option>`).join("");
 }
 
+
+function updateTransactionPagination(meta) {
+  transactionCurrentPage = Number(meta.page || transactionCurrentPage || 1);
+  transactionPageSize = Number(meta.pageSize || transactionPageSize || 10);
+  transactionTotalPages = Math.max(1, Number(meta.totalPages || 1));
+  transactionTotalRows = Number(meta.totalRows || 0);
+
+  const pageInfo = el("transactionPageInfo");
+  if (pageInfo) {
+    pageInfo.innerText = "Trang " + transactionCurrentPage + "/" + transactionTotalPages + " - Tổng " + transactionTotalRows + " giao dịch";
+  }
+
+  const pageSizeSelect = el("transactionPageSize");
+  if (pageSizeSelect) {
+    pageSizeSelect.value = String(transactionPageSize);
+  }
+}
+
+function changeTransactionPageSize() {
+  const select = el("transactionPageSize");
+  transactionPageSize = Number(select ? select.value : 10);
+  transactionCurrentPage = 1;
+  loadTransactions();
+}
+
+function goTransactionPage(step) {
+  const nextPage = transactionCurrentPage + step;
+  if (nextPage < 1 || nextPage > transactionTotalPages) return;
+  transactionCurrentPage = nextPage;
+  loadTransactions();
+}
+
 function getFilters() {
   const q = new URLSearchParams();
   q.set("from", el("filterFrom").value);
@@ -128,12 +164,29 @@ function getFilters() {
   q.set("typeId", el("filterType").value || 0);
   q.set("categoryId", el("filterCategory").value || 0);
   q.set("keyword", el("filterKeyword").value || "");
+  q.set("page", transactionCurrentPage || 1);
+  q.set("pageSize", transactionPageSize || 10);
   return q.toString();
 }
 
-async function loadTransactions() {
+async function loadTransactions(resetPage) {
+  if (resetPage === true) {
+    transactionCurrentPage = 1;
+  }
+
+  const select = el("transactionPageSize");
+  if (select) {
+    transactionPageSize = Number(select.value || transactionPageSize || 10);
+  }
+
   const res = await api("transactions.ashx?" + getFilters());
-  renderTransactions(res.data);
+  renderTransactions(res.data || []);
+  updateTransactionPagination({
+    page: res.page || transactionCurrentPage,
+    pageSize: res.pageSize || transactionPageSize,
+    totalRows: res.totalRows || 0,
+    totalPages: res.totalPages || 1
+  });
   await loadStatistics();
 }
 
@@ -209,6 +262,7 @@ function resetFilters() {
   el("filterType").value = "0";
   fillCategorySelect("filterCategory", "", true);
   el("filterKeyword").value = "";
+  transactionCurrentPage = 1;
   loadTransactions();
 }
 

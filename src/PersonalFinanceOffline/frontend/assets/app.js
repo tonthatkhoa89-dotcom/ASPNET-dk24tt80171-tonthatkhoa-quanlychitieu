@@ -36,6 +36,12 @@ function formatDate(v) {
 }
 function today() { return new Date().toISOString().substring(0,10); }
 
+function addMonths(dateString, months) {
+  const d = dateString ? new Date(dateString) : new Date();
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().substring(0, 10);
+}
+
 async function api(path, options) {
   const response = await fetch(API_BASE + "/" + path, {
     credentials: "same-origin",
@@ -73,6 +79,7 @@ async function initData() {
   fillAllSelects();
   await loadTransactions();
   await loadStatistics();
+  await loadSavingsGoals();
   await loadUsers();
 }
 
@@ -82,6 +89,7 @@ function showTab(id) {
   el(id).classList.remove("hidden");
 
   const keyword = id === "transactions" ? "giao"
+    : id === "savingsGoals" ? "kế hoạch"
     : id === "categories" ? "danh"
     : id === "types" ? "loại"
     : "user";
@@ -91,6 +99,7 @@ function showTab(id) {
   if (nav) nav.classList.add("active");
 
   if (id === "transactions") loadStatistics();
+  if (id === "savingsGoals") loadSavingsGoals();
 }
 
 async function loadTypes() {
@@ -606,6 +615,120 @@ function clearUserForm() {
   el("password").value = "";
   el("userActive").value = "1";
 }
+
+
+async function loadSavingsGoals() {
+  try {
+    const res = await api("savingsGoals.ashx");
+    renderSavingsDashboard(res);
+    renderSavingsGoals(res.data || []);
+  } catch (e) {
+    if (el("budgetAlerts")) el("budgetAlerts").innerHTML = '<div class="alert alert-danger">Không tải được kế hoạch tiết kiệm: ' + e.message + '</div>';
+  }
+}
+
+function renderSavingsDashboard(res) {
+  const summary = res.summary || {};
+  const income = Number(summary.monthIncome || 0);
+  const expense = Number(summary.monthExpense || 0);
+  const saving = Number(summary.monthSaving || 0);
+  const balance = Number(summary.monthBalance || 0);
+
+  if (el("goalMonthIncome")) el("goalMonthIncome").innerHTML = '<span class="text-income">+ ' + money(income) + '</span>';
+  if (el("goalMonthExpense")) el("goalMonthExpense").innerHTML = '<span class="text-expense">- ' + money(expense) + '</span>';
+  if (el("goalMonthSaving")) el("goalMonthSaving").innerHTML = '<span class="text-saving">◇ ' + money(saving) + '</span>';
+  if (el("goalMonthBalance")) el("goalMonthBalance").innerHTML = balance >= 0
+    ? '<span class="text-income">+ ' + money(balance) + '</span>'
+    : '<span class="text-expense">- ' + money(Math.abs(balance)) + '</span>';
+
+  const alerts = res.alerts || [];
+  const recommendations = res.recommendations || [];
+
+  el("budgetAlerts").innerHTML = alerts.length
+    ? alerts.map(a => '<div class="alert ' + (a.level === "danger" ? "alert-danger" : "alert-warning") + '">' + a.message + '</div>').join("")
+    : '<div class="alert alert-ok">Chưa có cảnh báo ngân sách trong tháng này.</div>';
+
+  el("savingRecommendations").innerHTML = recommendations.length
+    ? recommendations.map(r => '<div class="recommendation-item">' + r + '</div>').join("")
+    : '<div class="recommendation-item">Chưa đủ dữ liệu để đưa ra gợi ý tiết kiệm.</div>';
+}
+
+function renderSavingsGoals(rows) {
+  el("savingsGoalTable").innerHTML = table(
+    ["Mục tiêu", "Thời gian", "Mục tiêu", "Đã tiết kiệm", "Còn thiếu", "Tiến độ", "Ngân sách/tháng", "Trạng thái", ""],
+    rows.map(g => [
+      g.GoalName,
+      formatDate(g.StartDate) + " → " + formatDate(g.TargetDate),
+      money(g.TargetAmount),
+      money(g.SavedAmount),
+      money(g.RemainingAmount),
+      '<div class="progress-wrap"><div class="progress-bar" style="width:' + Math.min(100, Number(g.ProgressPercent || 0)) + '%"></div></div><div class="progress-text">' + Number(g.ProgressPercent || 0).toFixed(1) + '%</div>',
+      money(g.MonthlyBudget),
+      g.IsActive ? "Đang theo dõi" : "Tạm dừng",
+      `<button onclick='editSavingsGoal(${JSON.stringify(g)})'>Sửa</button>
+       <button class="danger" onclick="deleteSavingsGoal(${g.GoalId})">Xóa</button>`
+    ])
+  );
+}
+
+async function saveSavingsGoal() {
+  const data = {
+    action: "save",
+    goalId: Number(el("goalId").value || 0),
+    goalName: el("goalName").value,
+    targetAmount: Number(el("goalTargetAmount").value),
+    monthlyBudget: Number(el("goalMonthlyBudget").value),
+    startDate: el("goalStartDate").value,
+    targetDate: el("goalTargetDate").value,
+    isActive: Number(el("goalActive").value)
+  };
+
+  if (!data.goalName || data.targetAmount <= 0 || data.monthlyBudget <= 0 || !data.startDate || !data.targetDate) {
+    alert("Vui lòng nhập đủ tên mục tiêu, số tiền mục tiêu, ngân sách tháng, ngày bắt đầu và ngày đạt mục tiêu.");
+    return;
+  }
+
+  await api("savingsGoals.ashx", {
+    method: "POST",
+    body: JSON.stringify(data)
+  });
+
+  clearSavingsGoalForm();
+  await loadSavingsGoals();
+}
+
+function editSavingsGoal(g) {
+  el("goalId").value = g.GoalId;
+  el("goalName").value = g.GoalName;
+  el("goalTargetAmount").value = Number(g.TargetAmount || 0);
+  el("goalMonthlyBudget").value = Number(g.MonthlyBudget || 0);
+  el("goalStartDate").value = formatDate(g.StartDate);
+  el("goalTargetDate").value = formatDate(g.TargetDate);
+  el("goalActive").value = g.IsActive ? "1" : "0";
+  window.scrollTo(0,0);
+}
+
+async function deleteSavingsGoal(id) {
+  if (!confirm("Xóa mục tiêu tiết kiệm này?")) return;
+
+  await api("savingsGoals.ashx", {
+    method: "POST",
+    body: JSON.stringify({ action: "delete", goalId: id })
+  });
+
+  await loadSavingsGoals();
+}
+
+function clearSavingsGoalForm() {
+  el("goalId").value = "";
+  el("goalName").value = "";
+  el("goalTargetAmount").value = "";
+  el("goalMonthlyBudget").value = "";
+  el("goalStartDate").value = today();
+  el("goalTargetDate").value = addMonths(today(), 12);
+  el("goalActive").value = "1";
+}
+
 
 (async function checkLogin() {
   try {

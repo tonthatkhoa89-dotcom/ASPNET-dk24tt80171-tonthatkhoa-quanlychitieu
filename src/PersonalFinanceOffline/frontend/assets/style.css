@@ -654,3 +654,81 @@ button.period.active {
 .pagination-bar button {
   min-width: 92px;
 }
+
+
+/* Savings goals / budget planning */
+.goal-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 18px 0 24px;
+}
+
+.alert-list,
+.recommendation-list {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 24px;
+}
+
+.alert {
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.alert-danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.alert-warning {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.alert-ok {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #86efac;
+}
+
+.recommendation-item {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  border: 1px solid #bfdbfe;
+  font-weight: 600;
+}
+
+.progress-wrap {
+  width: 140px;
+  height: 12px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #16a34a, #2563eb);
+}
+
+.progress-text {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #475569;
+  font-weight: 700;
+}
+
+@media(max-width:900px) {
+  .goal-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}

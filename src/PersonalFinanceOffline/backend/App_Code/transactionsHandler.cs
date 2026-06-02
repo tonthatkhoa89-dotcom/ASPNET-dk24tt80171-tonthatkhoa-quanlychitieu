@@ -14,30 +14,69 @@ public class TransactionsHandler : IHttpHandler, IRequiresSessionState
 
         if (method == "GET")
         {
-            string sql = @"SELECT tr.TransactionId,
-                                  CONVERT(varchar(10), tr.TransactionDate, 120) AS TransactionDate,
-                                  tr.TypeId, tt.TypeCode, tt.TypeName,
-                                  tr.CategoryId, c.CategoryName, tr.Amount, tr.Note
-                           FROM Transactions tr
-                           INNER JOIN TransactionTypes tt ON tr.TypeId = tt.TypeId
-                           INNER JOIN Categories c ON tr.CategoryId = c.CategoryId
-                           WHERE tr.UserId=@UserId
-                             AND (@From='' OR tr.TransactionDate >= CONVERT(date,@From))
-                             AND (@To='' OR tr.TransactionDate <= CONVERT(date,@To))
-                             AND (@TypeId=0 OR tr.TypeId=@TypeId)
-                             AND (@CategoryId=0 OR tr.CategoryId=@CategoryId)
-                             AND (@Keyword='' OR tr.Note LIKE '%' + @Keyword + '%')
-                           ORDER BY tr.TransactionDate DESC, tr.TransactionId DESC";
+            int page = WebUtil.I(context.Request.QueryString["page"]);
+            int pageSize = WebUtil.I(context.Request.QueryString["pageSize"]);
 
-            var rows = WebUtil.ToRows(Db.Query(sql,
+            if (page <= 0) page = 1;
+            if (pageSize != 10 && pageSize != 20 && pageSize != 50) pageSize = 10;
+
+            string whereSql = @" WHERE tr.UserId=@UserId
+                           AND (@From='' OR tr.TransactionDate >= CONVERT(date,@From))
+                           AND (@To='' OR tr.TransactionDate <= CONVERT(date,@To))
+                           AND (@TypeId=0 OR tr.TypeId=@TypeId)
+                           AND (@CategoryId=0 OR tr.CategoryId=@CategoryId)
+                           AND (@Keyword='' OR tr.Note LIKE '%' + @Keyword + '%') ";
+
+            SqlParameter[] filterParams = new SqlParameter[] {
                 new SqlParameter("@UserId", WebUtil.CurrentUserId(context)),
                 new SqlParameter("@From", WebUtil.S(context.Request.QueryString["from"])),
                 new SqlParameter("@To", WebUtil.S(context.Request.QueryString["to"])),
                 new SqlParameter("@TypeId", WebUtil.I(context.Request.QueryString["typeId"])),
                 new SqlParameter("@CategoryId", WebUtil.I(context.Request.QueryString["categoryId"])),
-                new SqlParameter("@Keyword", WebUtil.S(context.Request.QueryString["keyword"]))));
+                new SqlParameter("@Keyword", WebUtil.S(context.Request.QueryString["keyword"]))
+            };
 
-            WebUtil.WriteJson(context, new { ok = true, data = rows });
+            object countValue = Db.Scalar(@"SELECT COUNT(1)
+                           FROM Transactions tr
+                           INNER JOIN TransactionTypes tt ON tr.TypeId=tt.TypeId
+                           INNER JOIN Categories c ON tr.CategoryId=c.CategoryId " + whereSql,
+                           filterParams);
+
+            int totalRows = Convert.ToInt32(countValue);
+            int totalPages = totalRows == 0 ? 1 : (int)Math.Ceiling(totalRows / (decimal)pageSize);
+
+            if (page > totalPages) page = totalPages;
+            int offset = (page - 1) * pageSize;
+
+            string sql = @"SELECT tr.TransactionId, tr.TransactionDate, tr.TypeId, tt.TypeCode, tt.TypeName,
+                                  tr.CategoryId, c.CategoryName, tr.Amount, tr.Note
+                           FROM Transactions tr
+                           INNER JOIN TransactionTypes tt ON tr.TypeId=tt.TypeId
+                           INNER JOIN Categories c ON tr.CategoryId=c.CategoryId " + whereSql + @"
+                           ORDER BY tr.TransactionDate DESC, tr.TransactionId DESC
+                           OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+
+            SqlParameter[] dataParams = new SqlParameter[] {
+                new SqlParameter("@UserId", WebUtil.CurrentUserId(context)),
+                new SqlParameter("@From", WebUtil.S(context.Request.QueryString["from"])),
+                new SqlParameter("@To", WebUtil.S(context.Request.QueryString["to"])),
+                new SqlParameter("@TypeId", WebUtil.I(context.Request.QueryString["typeId"])),
+                new SqlParameter("@CategoryId", WebUtil.I(context.Request.QueryString["categoryId"])),
+                new SqlParameter("@Keyword", WebUtil.S(context.Request.QueryString["keyword"])),
+                new SqlParameter("@Offset", offset),
+                new SqlParameter("@PageSize", pageSize)
+            };
+
+            var rows = WebUtil.ToRows(Db.Query(sql, dataParams));
+
+            WebUtil.WriteJson(context, new {
+                ok = true,
+                data = rows,
+                page = page,
+                pageSize = pageSize,
+                totalRows = totalRows,
+                totalPages = totalPages
+            });
             return;
         }
 

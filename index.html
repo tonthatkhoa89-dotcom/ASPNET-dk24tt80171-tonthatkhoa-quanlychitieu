@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Ứng dụng quản lý chi tiêu</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="assets/style.css" rel="stylesheet">
+</head>
+<body>
+  <div id="loginView" class="login-page">
+    <div class="login-shell">
+      <div class="login-intro">
+        <div class="brand-row">
+          <div class="brand-mark">PF</div>
+          <div>
+            <div class="brand-title">Personal Finance</div>
+            <div class="brand-subtitle">Quản lý thu nhập, chi tiêu và tiết kiệm</div>
+          </div>
+        </div>
+
+        <h1>Ứng dụng quản lý chi tiêu</h1>
+        <p class="intro-text">
+          Ghi nhận giao dịch hằng ngày, phân loại thu chi, theo dõi tiết kiệm và xem thống kê trực quan.
+        </p>
+
+        <div class="topic-panel">
+          <div class="topic-row">
+            <span>Đề tài</span>
+            <strong>Ứng dụng quản lý chi tiêu</strong>
+          </div>
+          <div class="topic-row">
+            <span>GVHD</span>
+            <strong>TS Đoàn Phước Miền</strong>
+          </div>
+          <div class="topic-row">
+            <span>Lớp</span>
+            <strong>DK24TT80171</strong>
+          </div>
+          <div class="topic-row">
+            <span>Họ và tên</span>
+            <strong>Tôn Thất Khoa</strong>
+          </div>
+          <div class="topic-row">
+            <span>MSSV</span>
+            <strong>170124890</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="login-card">
+        <div class="login-card-header">
+          <h2>Đăng nhập hệ thống</h2>
+          <p>Sử dụng tài khoản được cấp để vào trang quản lý.</p>
+        </div>
+
+        <div class="login-form">
+          <label for="loginUsername">Tên đăng nhập</label>
+          <input id="loginUsername" type="text" value="admin" autocomplete="username" />
+
+          <label for="loginPassword">Mật khẩu</label>
+          <input id="loginPassword" type="password" value="admin123" autocomplete="current-password" />
+
+          <button class="login-button" onclick="login()">Đăng nhập</button>
+          <div id="loginMessage" class="message"></div>
+        </div>
+
+        <div class="login-note">
+          <span>Tài khoản mặc định:</span>
+          <strong>admin / admin123</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="appView" class="app hidden">
+    <aside>
+      <h2>Thu chi</h2>
+      <button class="nav active" onclick="showTab('transactions')">Giao dịch</button>
+      <button class="nav" onclick="showTab('categories')">Danh mục</button>
+      <button class="nav" onclick="showTab('types')">Loại thu/chi</button>
+      <button class="nav" onclick="showTab('users')">User</button>
+      <button class="logout" onclick="logout()">Đăng xuất</button>
+    </aside>
+
+    <main>
+      <section id="transactions" class="tab">
+        <h1>Quản lý giao dịch</h1>
+        <div class="grid form-grid">
+          <input type="hidden" id="transactionId">
+          <label>Ngày<input id="transactionDate" type="date"></label>
+          <label>Loại<select id="transactionType" onchange="fillCategorySelect('transactionCategory', this.value)"></select></label>
+          <label>Danh mục<select id="transactionCategory"></select></label>
+          <label>Số tiền<input id="transactionAmount" type="number" min="0" step="1000"></label>
+          <label>Ghi chú<input id="transactionNote"></label>
+        </div>
+        <div class="actions">
+          <button onclick="saveTransaction()">Lưu</button>
+          <button class="secondary" onclick="clearTransactionForm()">Nhập mới</button>
+        </div>
+
+        <h2>Tìm kiếm, lọc</h2>
+        <div class="grid filter-grid">
+          <label>Từ ngày<input id="filterFrom" type="date"></label>
+          <label>Đến ngày<input id="filterTo" type="date"></label>
+          <label>Loại<select id="filterType" onchange="fillCategorySelect('filterCategory', this.value, true)"></select></label>
+          <label>Danh mục<select id="filterCategory"></select></label>
+          <label>Từ khóa<input id="filterKeyword" placeholder="ghi chú"></label>
+        </div>
+        <div class="actions">
+          <button onclick="loadTransactions()">Lọc</button>
+          <button class="secondary" onclick="resetFilters()">Xóa lọc</button>
+        </div>
+
+        <div class="inline-statistics">
+          <h2>Thống kê tài chính</h2>
+          <div class="cards cards-four">
+            <div class="card"><span>Tổng thu</span><strong id="totalIncome">0</strong></div>
+            <div class="card"><span>Tổng chi</span><strong id="totalExpense">0</strong></div>
+            <div class="card"><span>Tổng tiết kiệm</span><strong id="totalSaving">0</strong></div>
+            <div class="card"><span>Số dư khả dụng</span><strong id="balance">0</strong></div>
+          </div>
+
+          <div class="chart-toolbar">
+            <span>Biểu đồ thu / chi:</span>
+            <button id="btnPeriodDay" class="period active" onclick="setChartPeriod('day')">Ngày</button>
+            <button id="btnPeriodMonth" class="period" onclick="setChartPeriod('month')">Tháng</button>
+            <button id="btnPeriodYear" class="period" onclick="setChartPeriod('year')">Năm</button>
+          </div>
+
+          <div class="pie-grid">
+            <div>
+              <h2>Tỷ lệ chi tiêu theo danh mục</h2>
+              <canvas id="expensePieChart" width="520" height="340"></canvas>
+            </div>
+            <div>
+              <h2>Tỷ lệ thu nhập theo danh mục</h2>
+              <canvas id="incomePieChart" width="520" height="340"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-grid">
+            <div>
+              <h2>Tỷ lệ tiết kiệm theo danh mục</h2>
+              <canvas id="savingPieChart" width="760" height="320"></canvas>
+            </div>
+            <div>
+              <h2 id="periodChartTitle">Thu / Chi / Tiết kiệm theo 7 ngày gần nhất</h2>
+              <canvas id="monthChart" width="760" height="320"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div id="transactionTable"></div>
+      </section>
+
+      <section id="categories" class="tab hidden">
+        <h1>Quản lý danh mục</h1>
+        <div class="grid form-grid">
+          <input type="hidden" id="categoryId">
+          <label>Loại<select id="categoryType"></select></label>
+          <label>Tên danh mục<input id="categoryName"></label>
+          <label>Hoạt động<select id="categoryActive"><option value="1">Có</option><option value="0">Không</option></select></label>
+        </div>
+        <div class="actions">
+          <button onclick="saveCategory()">Lưu</button>
+          <button class="secondary" onclick="clearCategoryForm()">Nhập mới</button>
+        </div>
+        <div id="categoryTable"></div>
+      </section>
+
+      <section id="types" class="tab hidden">
+        <h1>Quản lý loại thu/chi</h1>
+        <div class="grid form-grid">
+          <input type="hidden" id="typeId">
+          <label>Mã loại<input id="typeCode" placeholder="Income hoặc Expense"></label>
+          <label>Tên loại<input id="typeName"></label>
+        </div>
+        <div class="actions">
+          <button onclick="saveType()">Lưu</button>
+          <button class="secondary" onclick="clearTypeForm()">Nhập mới</button>
+        </div>
+        <div id="typeTable"></div>
+      </section>
+
+      <section id="users" class="tab hidden">
+        <h1>Quản lý user</h1>
+        <div class="grid form-grid">
+          <input type="hidden" id="userId">
+          <label>Tài khoản<input id="username"></label>
+          <label>Họ tên<input id="fullName"></label>
+          <label>Mật khẩu<input id="password" type="password" placeholder="để trống nếu không đổi"></label>
+          <label>Hoạt động<select id="userActive"><option value="1">Có</option><option value="0">Không</option></select></label>
+        </div>
+        <div class="actions">
+          <button onclick="saveUser()">Lưu</button>
+          <button class="secondary" onclick="clearUserForm()">Nhập mới</button>
+        </div>
+        <div id="userTable"></div>
+      </section>
+    </main>
+  </div>
+
+  
+    <footer class="app-footer">
+      <div>Đề tài: ứng dụng quản lý chi tiêu | GVHD: TS Đoàn Phước Miền | Lớp: DK24TT80171 | Họ và tên: Tôn Thất Khoa | MSSV: 170124890</div>
+    </footer>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

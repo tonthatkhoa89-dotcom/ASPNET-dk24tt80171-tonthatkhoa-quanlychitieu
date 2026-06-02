@@ -340,9 +340,9 @@
       <h2>Thu chi</h2>
       <button class="nav active" onclick="showTab('transactions')">Giao dịch</button>
       <button class="nav" onclick="showTab('savingsGoals')">Kế hoạch tiết kiệm</button>
-      <button class="nav" onclick="showTab('categories')">Danh mục</button>
-      <button class="nav" onclick="showTab('types')">Loại thu/chi</button>
-      <button class="nav" onclick="showTab('users')">User</button>
+      <button id="navCategories" class="nav admin-only" onclick="showTab('categories')">Danh mục</button>
+      <button id="navTypes" class="nav admin-only" onclick="showTab('types')">Loại thu/chi</button>
+      <button id="navUsers" class="nav admin-only" onclick="showTab('users')">User</button>
       <button class="logout" onclick="logout()">Đăng xuất</button>
     </aside>
 
@@ -473,7 +473,7 @@
       </section>
 
 
-      <section id="categories" class="tab hidden">
+      <section id="categories" class="tab hidden admin-only">
         <h1>Quản lý danh mục</h1>
         <div class="grid form-grid">
           <input type="hidden" id="categoryId">
@@ -488,7 +488,7 @@
         <div id="categoryTable"></div>
       </section>
 
-      <section id="types" class="tab hidden">
+      <section id="types" class="tab hidden admin-only">
         <h1>Quản lý loại thu/chi</h1>
         <div class="grid form-grid">
           <input type="hidden" id="typeId">
@@ -502,7 +502,7 @@
         <div id="typeTable"></div>
       </section>
 
-      <section id="users" class="tab hidden">
+      <section id="users" class="tab hidden admin-only">
         <h1>Quản lý user</h1>
         <div class="grid form-grid">
           <input type="hidden" id="userId">
@@ -510,6 +510,12 @@
           <label>Họ tên<input id="fullName"></label>
           <label>Mật khẩu<input id="password" type="password" placeholder="để trống nếu không đổi"></label>
           <label>Hoạt động<select id="userActive"><option value="1">Có</option><option value="0">Không</option></select></label>
+          <label>Phân quyền
+            <select id="userRole">
+              <option value="0">User thường</option>
+              <option value="1">Admin</option>
+            </select>
+          </label>
         </div>
         <div class="actions">
           <button onclick="saveUser()">Lưu</button>

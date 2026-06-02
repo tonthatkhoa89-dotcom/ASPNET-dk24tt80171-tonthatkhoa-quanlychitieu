@@ -732,3 +732,31 @@ button.period.active {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Role management */
+.role-badge {
+  display: inline-block;
+  min-width: 86px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.role-admin {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+.role-user {
+  background: #e0f2fe;
+  color: #075985;
+  border: 1px solid #7dd3fc;
+}
+
+#userRole {
+  min-width: 160px;
+}

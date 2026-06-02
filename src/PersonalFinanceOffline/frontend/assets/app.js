@@ -6,6 +6,7 @@ let transactionCurrentPage = 1;
 let transactionPageSize = 10;
 let transactionTotalPages = 1;
 let transactionTotalRows = 0;
+let currentUser = null;
 
 function el(id) { return document.getElementById(id); }
 function money(v) { return Number(v || 0).toLocaleString("vi-VN"); }
@@ -53,14 +54,53 @@ async function api(path, options) {
   return data;
 }
 
+
+function isCurrentUserAdmin() {
+  return currentUser && currentUser.isAdmin === true;
+}
+
+function applyUserPermissions() {
+  const isAdmin = isCurrentUserAdmin();
+
+  document.querySelectorAll(".admin-only").forEach(x => {
+    if (isAdmin) {
+      x.classList.remove("hidden");
+      x.style.display = "";
+      x.setAttribute("aria-hidden", "false");
+    } else {
+      x.classList.add("hidden");
+      x.style.display = "none";
+      x.setAttribute("aria-hidden", "true");
+    }
+  });
+
+  if (!isAdmin) {
+    ["categories", "types", "users"].forEach(id => {
+      const tab = el(id);
+      if (tab) tab.classList.add("hidden");
+    });
+  }
+}
+
+function canOpenTab(id) {
+  if (["categories", "types", "users"].includes(id) && !isCurrentUserAdmin()) {
+    alert("Tài khoản thường chỉ được vào Giao dịch và Kế hoạch tiết kiệm.");
+    applyUserPermissions();
+    return false;
+  }
+  return true;
+}
+
 async function login() {
   try {
     const data = await api("login.ashx", {
       method: "POST",
       body: JSON.stringify({ username: el("loginUsername").value, password: el("loginPassword").value })
     });
+    currentUser = data.user || null;
     el("loginView").classList.add("hidden");
     el("appView").classList.remove("hidden");
+    applyUserPermissions();
     await initData();
   } catch (e) {
     el("loginMessage").innerText = e.message;
@@ -80,10 +120,12 @@ async function initData() {
   await loadTransactions();
   await loadStatistics();
   await loadSavingsGoals();
-  await loadUsers();
+  if (isCurrentUserAdmin()) await loadUsers();
+  applyUserPermissions();
 }
 
 function showTab(id) {
+  if (!canOpenTab(id)) return;
   document.querySelectorAll(".tab").forEach(x => x.classList.add("hidden"));
   document.querySelectorAll(".nav").forEach(x => x.classList.remove("active"));
   el(id).classList.remove("hidden");
@@ -105,13 +147,13 @@ function showTab(id) {
 async function loadTypes() {
   const res = await api("transactionTypes.ashx");
   types = res.data;
-  renderTypes();
+  if (isCurrentUserAdmin() && el("typeTable")) renderTypes();
 }
 
 async function loadCategories() {
   const res = await api("categories.ashx");
   categories = res.data;
-  renderCategories();
+  if (isCurrentUserAdmin() && el("categoryTable")) renderCategories();
 }
 
 function fillAllSelects() {
@@ -569,9 +611,14 @@ function clearTypeForm() {
 }
 
 async function loadUsers() {
+  if (!isCurrentUserAdmin()) return;
+
   const res = await api("users.ashx");
-  el("userTable").innerHTML = table(["Tài khoản","Họ tên","Hoạt động",""], res.data.map(u => [
-    u.Username, u.FullName || "", u.IsActive ? "Có" : "Không",
+  el("userTable").innerHTML = table(["Tài khoản","Họ tên","Hoạt động","Phân quyền",""], res.data.map(u => [
+    u.Username,
+    u.FullName || "",
+    u.IsActive ? "Có" : "Không",
+    u.IsAdmin ? '<span class="role-badge role-admin">Admin</span>' : '<span class="role-badge role-user">User thường</span>',
     `<button onclick='editUser(${JSON.stringify(u)})'>Sửa</button>
      <button class="danger" onclick="deleteUser(${u.UserId})">Xóa</button>`
   ]));
@@ -583,7 +630,8 @@ async function saveUser() {
     username: el("username").value,
     fullName: el("fullName").value,
     password: el("password").value,
-    isActive: Number(el("userActive").value)
+    isActive: Number(el("userActive").value),
+    isAdmin: Number(el("userRole") ? el("userRole").value : 0)
   };
   data.action = "save";
   await api("users.ashx", { method: "POST", body: JSON.stringify(data) });
@@ -597,6 +645,7 @@ function editUser(u) {
   el("fullName").value = u.FullName || "";
   el("password").value = "";
   el("userActive").value = u.IsActive ? "1" : "0";
+  if (el("userRole")) el("userRole").value = u.IsAdmin ? "1" : "0";
 }
 
 async function deleteUser(id) {
@@ -605,7 +654,8 @@ async function deleteUser(id) {
     method: "POST",
     body: JSON.stringify({ action: "delete", userId: id })
   });
-  await loadUsers();
+  if (isCurrentUserAdmin()) await loadUsers();
+  applyUserPermissions();
 }
 
 function clearUserForm() {
@@ -614,8 +664,8 @@ function clearUserForm() {
   el("fullName").value = "";
   el("password").value = "";
   el("userActive").value = "1";
+  if (el("userRole")) el("userRole").value = "0";
 }
-
 
 async function loadSavingsGoals() {
   try {
@@ -734,8 +784,10 @@ function clearSavingsGoalForm() {
   try {
     const res = await api("me.ashx");
     if (res.ok) {
+      currentUser = res.user || null;
       el("loginView").classList.add("hidden");
       el("appView").classList.remove("hidden");
+      applyUserPermissions();
       await initData();
     }
   } catch(e) {}

@@ -610,3 +610,47 @@ button.period.active {
     margin-top: 4px;
   }
 }
+
+
+/* Pagination for transaction management */
+.pagination-bar {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pagination-left,
+.pagination-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pagination-bar label,
+.pagination-bar span {
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pagination-bar select {
+  height: 34px;
+  min-width: 76px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 0 8px;
+  color: #0f172a;
+}
+
+.pagination-bar button {
+  min-width: 92px;
+}

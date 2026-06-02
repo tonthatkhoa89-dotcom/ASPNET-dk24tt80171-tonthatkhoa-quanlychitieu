@@ -4,7 +4,270 @@
   <meta charset="utf-8">
   <title>Ứng dụng quản lý chi tiêu</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="assets/style.css" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css?v=login20260602" />
+
+  <style id="critical-login-css">
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f6f8fb;
+      color: #0f172a;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .login-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      background: #eef4ff;
+      background-image: linear-gradient(135deg, rgba(37,99,235,.10), rgba(22,163,74,.08), rgba(248,250,252,.95));
+      box-sizing: border-box;
+    }
+
+    .login-shell {
+      width: 100%;
+      max-width: 1080px;
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      background: #fff;
+      border: 1px solid #dbe4f0;
+      border-radius: 22px;
+      box-shadow: 0 18px 45px rgba(15,23,42,.16);
+      overflow: hidden;
+    }
+
+    .login-intro {
+      padding: 42px;
+      background: linear-gradient(145deg, #0f172a 0%, #1e3a8a 55%, #14532d 100%);
+      color: #fff;
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 34px;
+    }
+
+    .brand-mark {
+      width: 58px;
+      height: 58px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      color: #1d4ed8;
+      font-weight: 900;
+      font-size: 22px;
+      letter-spacing: 1px;
+      box-shadow: 0 10px 25px rgba(0,0,0,.18);
+    }
+
+    .brand-title {
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .brand-subtitle {
+      margin-top: 4px;
+      font-size: 13px;
+      color: #dbeafe;
+    }
+
+    .login-intro h1 {
+      margin: 0;
+      font-size: 36px;
+      line-height: 1.15;
+      letter-spacing: -.4px;
+    }
+
+    .intro-text {
+      margin: 16px 0 28px;
+      color: #e0f2fe;
+      font-size: 16px;
+      line-height: 1.65;
+    }
+
+    .topic-panel {
+      background: rgba(255,255,255,.11);
+      border: 1px solid rgba(255,255,255,.20);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .topic-row {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 14px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,.14);
+      font-size: 14px;
+    }
+
+    .topic-row:last-child {
+      border-bottom: 0;
+    }
+
+    .topic-row span {
+      color: #bfdbfe;
+    }
+
+    .topic-row strong {
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .login-card {
+      padding: 42px 38px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background: #fff;
+      box-sizing: border-box;
+    }
+
+    .login-card-header {
+      margin-bottom: 24px;
+    }
+
+    .login-card-header h2 {
+      margin: 0;
+      font-size: 26px;
+      color: #0f172a;
+    }
+
+    .login-card-header p {
+      margin: 8px 0 0;
+      color: #64748b;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .login-form {
+      display: grid;
+      gap: 10px;
+    }
+
+    .login-form label {
+      margin-top: 6px;
+      color: #334155;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .login-form input {
+      width: 100%;
+      height: 44px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 0 13px;
+      background: #f8fafc;
+      color: #0f172a;
+      font-size: 15px;
+      box-sizing: border-box;
+      outline: none;
+    }
+
+    .login-form input:focus {
+      background: #fff;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.16);
+    }
+
+    .login-button {
+      width: 100%;
+      height: 46px;
+      margin-top: 14px;
+      border: 0;
+      border-radius: 10px;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 800;
+      font-size: 15px;
+      cursor: pointer;
+      box-shadow: 0 10px 22px rgba(37,99,235,.22);
+    }
+
+    .login-button:hover {
+      background: #1d4ed8;
+    }
+
+    .login-note {
+      margin-top: 18px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #f1f5f9;
+      color: #475569;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .login-note strong {
+      color: #0f172a;
+    }
+
+    #loginMessage.message,
+    .login-form .message {
+      min-height: 20px;
+      color: #dc2626;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    @media (max-width: 920px) {
+      .login-shell {
+        grid-template-columns: 1fr;
+        max-width: 620px;
+      }
+
+      .login-intro {
+        padding: 30px;
+      }
+
+      .login-intro h1 {
+        font-size: 30px;
+      }
+
+      .login-card {
+        padding: 30px;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .login-page {
+        padding: 14px;
+      }
+
+      .login-intro,
+      .login-card {
+        padding: 22px;
+      }
+
+      .topic-row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+
+      .login-note {
+        display: block;
+      }
+
+      .login-note strong {
+        display: block;
+        margin-top: 4px;
+      }
+    }
+  </style>
+
 </head>
 <body>
   <div id="loginView" class="login-page">
@@ -107,7 +370,7 @@
           <label>Từ khóa<input id="filterKeyword" placeholder="ghi chú"></label>
         </div>
         <div class="actions">
-          <button onclick="loadTransactions()">Lọc</button>
+          <button onclick="loadTransactions(true)">Lọc</button>
           <button class="secondary" onclick="resetFilters()">Xóa lọc</button>
         </div>
 
@@ -147,6 +410,24 @@
               <h2 id="periodChartTitle">Thu / Chi / Tiết kiệm theo 7 ngày gần nhất</h2>
               <canvas id="monthChart" width="760" height="320"></canvas>
             </div>
+          </div>
+        </div>
+
+
+        <div class="pagination-bar">
+          <div class="pagination-left">
+            <label for="transactionPageSize">Hiển thị</label>
+            <select id="transactionPageSize" onchange="changeTransactionPageSize()">
+              <option value="10" selected>10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+            </select>
+            <span>giao dịch / trang</span>
+          </div>
+          <div class="pagination-right">
+            <button class="secondary" onclick="goTransactionPage(-1)">Trang trước</button>
+            <span id="transactionPageInfo">Trang 1/1</span>
+            <button class="secondary" onclick="goTransactionPage(1)">Trang sau</button>
           </div>
         </div>
 

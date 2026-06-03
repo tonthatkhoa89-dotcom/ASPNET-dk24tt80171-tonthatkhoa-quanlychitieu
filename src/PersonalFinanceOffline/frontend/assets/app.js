@@ -43,6 +43,26 @@ function addMonths(dateString, months) {
   return d.toISOString().substring(0, 10);
 }
 
+function isDateRangeValid(fromDate, toDate, allowEqual) {
+  if (!fromDate || !toDate) return true;
+
+  const from = new Date(fromDate);
+  const to = new Date(toDate);
+
+  if (isNaN(from.getTime()) || isNaN(to.getTime())) return false;
+
+  return allowEqual ? to >= from : to > from;
+}
+
+function showDateError(message) {
+  if (typeof showToast === "function") {
+    showToast(message, "error");
+  } else {
+    alert(message);
+  }
+}
+
+
 async function api(path, options) {
   const response = await fetch(API_BASE + "/" + path, {
     credentials: "same-origin",
@@ -221,6 +241,14 @@ function getFilters() {
 }
 
 async function loadTransactions(resetPage) {
+  const fromDate = el("filterFrom") ? el("filterFrom").value : "";
+  const toDate = el("filterTo") ? el("filterTo").value : "";
+
+  if (!isDateRangeValid(fromDate, toDate, true)) {
+    showDateError("Ngày đến không được trước ngày bắt đầu.");
+    return;
+  }
+
   if (resetPage === true) {
     transactionCurrentPage = 1;
   }
@@ -734,7 +762,12 @@ async function saveSavingsGoal() {
   };
 
   if (!data.goalName || data.targetAmount <= 0 || data.monthlyBudget <= 0 || !data.startDate || !data.targetDate) {
-    alert("Vui lòng nhập đủ tên mục tiêu, số tiền mục tiêu, ngân sách tháng, ngày bắt đầu và ngày đạt mục tiêu.");
+    showDateError("Vui lòng nhập đủ tên mục tiêu, số tiền mục tiêu, ngân sách tháng, ngày bắt đầu và ngày đạt mục tiêu.");
+    return;
+  }
+
+  if (!isDateRangeValid(data.startDate, data.targetDate, false)) {
+    showDateError("Ngày đạt mục tiêu phải sau ngày bắt đầu.");
     return;
   }
 

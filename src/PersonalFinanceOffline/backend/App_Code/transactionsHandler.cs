@@ -1,4 +1,4 @@
-
+﻿
 using System;
 using System.Data;
 using System.Data.SqlClient;
@@ -14,6 +14,27 @@ public class TransactionsHandler : IHttpHandler, IRequiresSessionState
 
         if (method == "GET")
         {
+            string fromDateText = WebUtil.S(context.Request.QueryString["from"]);
+            string toDateText = WebUtil.S(context.Request.QueryString["to"]);
+
+            if (fromDateText != "" && toDateText != "")
+            {
+                DateTime fromDateValue;
+                DateTime toDateValue;
+
+                if (!DateTime.TryParse(fromDateText, out fromDateValue) ||
+                    !DateTime.TryParse(toDateText, out toDateValue))
+                {
+                    WebUtil.WriteError(context, 400, "Ngày lọc giao dịch không hợp lệ.");
+                    return;
+                }
+
+                if (toDateValue < fromDateValue)
+                {
+                    WebUtil.WriteError(context, 400, "Ngày đến không được trước ngày bắt đầu.");
+                    return;
+                }
+            }
             int page = WebUtil.I(context.Request.QueryString["page"]);
             int pageSize = WebUtil.I(context.Request.QueryString["pageSize"]);
 

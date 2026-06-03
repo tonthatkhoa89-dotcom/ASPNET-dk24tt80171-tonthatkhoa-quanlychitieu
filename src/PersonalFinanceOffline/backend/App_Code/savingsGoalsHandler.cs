@@ -239,6 +239,22 @@ ORDER BY TotalAmount DESC";
                 return;
             }
 
+            DateTime startDateValue;
+            DateTime targetDateValue;
+
+            if (!DateTime.TryParse(startDate, out startDateValue) ||
+                !DateTime.TryParse(targetDate, out targetDateValue))
+            {
+                WebUtil.WriteError(context, 400, "Ngày kế hoạch tiết kiệm không hợp lệ.");
+                return;
+            }
+
+            if (targetDateValue <= startDateValue)
+            {
+                WebUtil.WriteError(context, 400, "Ngày đạt mục tiêu phải sau ngày bắt đầu.");
+                return;
+            }
+
             if (goalId > 0)
             {
                 Db.Execute(@"UPDATE SavingsGoals

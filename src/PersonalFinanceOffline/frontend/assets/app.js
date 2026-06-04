@@ -295,17 +295,24 @@ async function saveTransaction() {
     amount: Number(el("transactionAmount").value),
     note: el("transactionNote").value
   };
+
   if (!data.transactionDate || !data.typeId || !data.categoryId || data.amount <= 0) {
     alert("Vui lòng nhập đủ ngày, loại, danh mục và số tiền > 0.");
     return;
   }
+
   data.action = "save";
-  await api("transactions.ashx", {
-    method: "POST",
-    body: JSON.stringify(data)
-  });
-  clearTransactionForm();
-  await loadTransactions();
+
+  try {
+    await api("transactions.ashx", {
+      method: "POST",
+      body: JSON.stringify(data)
+    });
+    clearTransactionForm();
+    await loadTransactions();
+  } catch (e) {
+    alert(e.message || "Không lưu được giao dịch.");
+  }
 }
 
 function editTransaction(r) {

@@ -102,38 +102,41 @@ Repository
 
 ---
 # Triển khai bằng script Auto Deploy
-### B0. Giải nén
 
-Giải nén:
-
-```text
-setup/scriptdeploy.zip
-```
-
-### B1. Chạy Deploy
-
-Chạy (Run as administrator):
-
-```text
-run_deploy.bat
-```
-
-Nhập tên SQL Instance. Vd: SQLEXPRESS hoặc MSSQLSERVER
-
-Nếu để trống sẽ sử dụng mặc định:
-
-```text
-SQLEXPRESS
-```
-Nhấn enter và chờ checklist hoàn tất.
-### B2. Hoàn tất
-
-Sau khi script hoàn tất, truy cập:
-
-```text
-http://localhost/PersonalFinanceOffline/frontend/index.html
-```
----
+<table>
+  <thead>
+    <tr>
+      <th>Bước</th>
+      <th>Nội dung</th>
+      <th>Chi tiết</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>B0</td>
+      <td>Giải nén</td>
+      <td>Giải nén file <code>setup/auto_deploy.zip</code></td>
+    </tr>
+    <tr>
+      <td>B1</td>
+      <td>Chạy Deploy</td>
+      <td>
+        Chạy <code>run_deploy.bat</code> bằng quyền <b>Run as administrator</b>.<br>
+        Nhập tên SQL Instance, ví dụ: <code>SQLEXPRESS</code> hoặc <code>MSSQLSERVER</code>.<br>
+        Nếu để trống sẽ sử dụng mặc định: <code>SQLEXPRESS</code>.<br>
+        Nhấn <b>Enter</b> và chờ checklist hoàn tất.
+      </td>
+    </tr>
+    <tr>
+      <td>B2</td>
+      <td>Hoàn tất</td>
+      <td>
+        Sau khi script hoàn tất, truy cập:<br>
+        <code>http://localhost/PersonalFinanceOffline/frontend/index.html</code>
+      </td>
+    </tr>
+  </tbody>
+</table>
 
 # Cài đặt thủ công
 

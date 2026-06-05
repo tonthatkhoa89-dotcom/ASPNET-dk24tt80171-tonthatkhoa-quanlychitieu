@@ -1,14 +1,11 @@
 # Thông tin đề tài ASP.NET
 
-## ỨNG DỤNG QUẢN LÝ THU CHI CÁ NHÂN
-
-**GVHD:** TS Đoàn Phước Miền
-
-**Lớp:** DK24TT80171
-
-**Họ và tên:** Tôn Thất Khoa
-
-**MSSV:** 170124890
+| GVHD | TS Đoàn Phước Miền |
+|---|---|
+| Đề tài | Ứng dụng quản lý thu chi cá nhân |
+| Lớp | DK24TT80171 |
+| Họ và tên | Tôn Thất Khoa |
+| MSSV | 170124890 |
 
 ---
 
@@ -32,31 +29,12 @@ Hệ thống cho phép người dùng:
 
 # 2. Công nghệ sử dụng
 
-## Backend
-
-* ASP.NET Framework 4.8
-* ASP.NET Web Handler (.ashx)
-* C#
-* ADO.NET
-* IIS Web Server
-
-## Frontend
-
-* HTML5
-* CSS3
-* JavaScript (Vanilla JS)
-
-## Database
-
-* Microsoft SQL Server 2018
-* SQL Server Express / SQL Server Developer
-
-## Môi trường triển khai
-
-* Windows 10 / 11
-* IIS
-* .NET Framework 4.8
-
+| Phần | Công nghệ / Ghi chú |
+|---|---|
+| Backend | ASP.NET Framework 4.8<br>ASP.NET Web Handler (.ashx)<br>C#<br>ADO.NET<br>IIS Web Server |
+| Frontend | HTML5<br>CSS3<br>JavaScript (Vanilla JS) |
+| Database | Microsoft SQL Server 2018<br>SQL Server Express / SQL Server Developer |
+| Môi trường triển khai | Windows 10 / 11<br>IIS<br>.NET Framework 4.8 |
 ---
 
 # 3. Cấu trúc thư mục
@@ -101,17 +79,27 @@ Repository
 
 ## Yêu cầu hệ thống (bắt buộc)
 
-### Hệ điều hành
+<table>
+  <tr>
+    <th colspan="2"><div align="center"><strong>Bắt buộc:</strong></div></th>
+  </tr>
+  <tr>
+    <td>Hệ điều hành</td>
+    <td>Windows 10 / 11</td>
+  </tr>
+  <tr>
+    <td>Database</td>
+    <td>Phải cài sẵn SQL Server Express (khuyến nghị) / Developer / Standard</td>
+  </tr>
+  <tr>
+    <td colspan="2"><div align="center"><strong>Script sẽ tự động enable:</strong></div></td>
+  </tr>
+  <tr>
+    <td>Enable Feature</td>
+    <td>IIS<br>.NET Framework 4.8</td>
+  </tr>
+</table>
 
-* Windows 10 / 11
-
-### Database
-
-* Phải cài sẵn SQL Server Express (khuyến nghị) / Developer / Standard
-  
-### Enable Feature (script sẽ tự động enable)
-* IIS
-* .NET Framework 4.8
 ---
 # Triển khai bằng script Auto Deploy
 ### B0. Giải nén

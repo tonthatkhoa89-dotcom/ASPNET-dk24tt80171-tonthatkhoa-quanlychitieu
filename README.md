@@ -99,7 +99,7 @@ Repository
 
 # 4. Cách thức triển khai cài đặt source code
 
-## Yêu cầu hệ thống
+## Yêu cầu hệ thống (bắt buộc)
 
 ### Hệ điều hành
 
@@ -108,15 +108,12 @@ Repository
 ### Database
 
 * Phải cài sẵn SQL Server Express (khuyến nghị) / Developer / Standard
-
----
-# Triển khai bằng script Auto Deploy
-**Yêu cầu:**
-
-* Windows 10 / 11
+  
+### Enable Feature (script sẽ tự động enable)
 * IIS
 * .NET Framework 4.8
-* SQL Server Express hoặc SQL Server
+---
+# Triển khai bằng script Auto Deploy
 ### B0. Giải nén
 
 Giải nén:

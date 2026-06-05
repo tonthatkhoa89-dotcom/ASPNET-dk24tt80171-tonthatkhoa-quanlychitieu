@@ -1,536 +1,834 @@
-<!doctype html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8">
-  <title>Ứng dụng quản lý chi tiêu</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="assets/style.css?v=login20260602" />
+const API_BASE = "../backend/api";
+let types = [];
+let categories = [];
+let currentChartPeriod = 'day';
+let transactionCurrentPage = 1;
+let transactionPageSize = 10;
+let transactionTotalPages = 1;
+let transactionTotalRows = 0;
+let currentUser = null;
 
-  <style id="critical-login-css">
-    body {
-      margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
-      background: #f6f8fb;
-      color: #0f172a;
+function el(id) { return document.getElementById(id); }
+function money(v) { return Number(v || 0).toLocaleString("vi-VN"); }
+function isIncomeRow(r) {
+  return String(r.TypeCode || "").toLowerCase() === "income" || String(r.TypeName || "").toLowerCase().indexOf("thu") >= 0;
+}
+function isSavingRow(r) {
+  return String(r.TypeCode || "").toLowerCase() === "saving" || String(r.TypeName || "").toLowerCase().indexOf("tiết") >= 0;
+}
+function typeBadge(r) {
+  if (isIncomeRow(r)) return '<span class="badge badge-income">Thu</span>';
+  if (isSavingRow(r)) return '<span class="badge badge-saving">Tiết kiệm</span>';
+  return '<span class="badge badge-expense">Chi</span>';
+}
+function signedAmount(r) {
+  const value = Number(r.Amount || 0);
+  if (isIncomeRow(r)) return '<span class="amount-income">+ ' + money(value) + '</span>';
+  if (isSavingRow(r)) return '<span class="amount-saving">◇ ' + money(value) + '</span>';
+  return '<span class="amount-expense">- ' + money(value) + '</span>';
+}
+function formatDate(v) {
+  if (!v) return "";
+  if (typeof v === "string" && v.indexOf("/Date(") === 0) {
+    const match = /\/Date\((\d+)/.exec(v);
+    if (match) return new Date(Number(match[1])).toISOString().substring(0, 10);
+  }
+  return String(v).substring(0, 10);
+}
+function today() { return new Date().toISOString().substring(0,10); }
+
+function addMonths(dateString, months) {
+  const d = dateString ? new Date(dateString) : new Date();
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().substring(0, 10);
+}
+
+function isDateRangeValid(fromDate, toDate, allowEqual) {
+  if (!fromDate || !toDate) return true;
+
+  const from = new Date(fromDate);
+  const to = new Date(toDate);
+
+  if (isNaN(from.getTime()) || isNaN(to.getTime())) return false;
+
+  return allowEqual ? to >= from : to > from;
+}
+
+function showDateError(message) {
+  if (typeof showToast === "function") {
+    showToast(message, "error");
+  } else {
+    alert(message);
+  }
+}
+
+
+async function api(path, options) {
+  const response = await fetch(API_BASE + "/" + path, {
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    ...options
+  });
+  const data = await response.json();
+  if (!response.ok || data.ok === false) throw new Error(data.message || "Có lỗi xảy ra.");
+  return data;
+}
+
+
+function isCurrentUserAdmin() {
+  return currentUser && currentUser.isAdmin === true;
+}
+
+function applyUserPermissions() {
+  const isAdmin = isCurrentUserAdmin();
+
+  document.querySelectorAll(".admin-only").forEach(x => {
+    if (isAdmin) {
+      x.classList.remove("hidden");
+      x.style.display = "";
+      x.setAttribute("aria-hidden", "false");
+    } else {
+      x.classList.add("hidden");
+      x.style.display = "none";
+      x.setAttribute("aria-hidden", "true");
     }
+  });
 
-    .hidden {
-      display: none !important;
+  if (!isAdmin) {
+    ["categories", "types", "users"].forEach(id => {
+      const tab = el(id);
+      if (tab) tab.classList.add("hidden");
+    });
+  }
+}
+
+function canOpenTab(id) {
+  if (["categories", "types", "users"].includes(id) && !isCurrentUserAdmin()) {
+    alert("Tài khoản thường chỉ được vào Giao dịch và Kế hoạch tiết kiệm.");
+    applyUserPermissions();
+    return false;
+  }
+  return true;
+}
+
+async function login() {
+  try {
+    const data = await api("login.ashx", {
+      method: "POST",
+      body: JSON.stringify({ username: el("loginUsername").value, password: el("loginPassword").value })
+    });
+    currentUser = data.user || null;
+    el("loginView").classList.add("hidden");
+    el("appView").classList.remove("hidden");
+    applyUserPermissions();
+    await initData();
+  } catch (e) {
+    el("loginMessage").innerText = e.message;
+  }
+}
+
+async function logout() {
+  await api("logout.ashx", { method: "POST" });
+  location.reload();
+}
+
+async function initData() {
+  el("transactionDate").value = today();
+  await loadTypes();
+  await loadCategories();
+  fillAllSelects();
+  await loadTransactions();
+  await loadStatistics();
+  await loadSavingsGoals();
+  if (isCurrentUserAdmin()) await loadUsers();
+  applyUserPermissions();
+}
+
+function showTab(id) {
+  if (!canOpenTab(id)) return;
+  document.querySelectorAll(".tab").forEach(x => x.classList.add("hidden"));
+  document.querySelectorAll(".nav").forEach(x => x.classList.remove("active"));
+  el(id).classList.remove("hidden");
+
+  const keyword = id === "transactions" ? "giao"
+    : id === "savingsGoals" ? "kế hoạch"
+    : id === "categories" ? "danh"
+    : id === "types" ? "loại"
+    : "user";
+
+  const nav = [...document.querySelectorAll(".nav")]
+    .find(b => b.textContent.toLowerCase().includes(keyword));
+  if (nav) nav.classList.add("active");
+
+  if (id === "transactions") loadStatistics();
+  if (id === "savingsGoals") loadSavingsGoals();
+}
+
+async function loadTypes() {
+  const res = await api("transactionTypes.ashx");
+  types = res.data;
+  if (isCurrentUserAdmin() && el("typeTable")) renderTypes();
+}
+
+async function loadCategories() {
+  const res = await api("categories.ashx");
+  categories = res.data;
+  if (isCurrentUserAdmin() && el("categoryTable")) renderCategories();
+}
+
+function fillAllSelects() {
+  fillTypeSelect("transactionType", false);
+  fillTypeSelect("filterType", true);
+  fillTypeSelect("categoryType", false);
+  fillCategorySelect("transactionCategory", el("transactionType").value);
+  fillCategorySelect("filterCategory", "", true);
+}
+
+function fillTypeSelect(id, all) {
+  const html = (all ? '<option value="0">Tất cả</option>' : "") +
+    types.map(t => `<option value="${t.TypeId}">${t.TypeName}</option>`).join("");
+  el(id).innerHTML = html;
+}
+
+function fillCategorySelect(id, typeId, all) {
+  const filtered = categories.filter(c => !typeId || typeId == "0" || c.TypeId == typeId);
+  el(id).innerHTML = (all ? '<option value="0">Tất cả</option>' : "") +
+    filtered.map(c => `<option value="${c.CategoryId}">${c.CategoryName}</option>`).join("");
+}
+
+
+function updateTransactionPagination(meta) {
+  transactionCurrentPage = Number(meta.page || transactionCurrentPage || 1);
+  transactionPageSize = Number(meta.pageSize || transactionPageSize || 10);
+  transactionTotalPages = Math.max(1, Number(meta.totalPages || 1));
+  transactionTotalRows = Number(meta.totalRows || 0);
+
+  const pageInfo = el("transactionPageInfo");
+  if (pageInfo) {
+    pageInfo.innerText = "Trang " + transactionCurrentPage + "/" + transactionTotalPages + " - Tổng " + transactionTotalRows + " giao dịch";
+  }
+
+  const pageSizeSelect = el("transactionPageSize");
+  if (pageSizeSelect) {
+    pageSizeSelect.value = String(transactionPageSize);
+  }
+}
+
+function changeTransactionPageSize() {
+  const select = el("transactionPageSize");
+  transactionPageSize = Number(select ? select.value : 10);
+  transactionCurrentPage = 1;
+  loadTransactions();
+}
+
+function goTransactionPage(step) {
+  const nextPage = transactionCurrentPage + step;
+  if (nextPage < 1 || nextPage > transactionTotalPages) return;
+  transactionCurrentPage = nextPage;
+  loadTransactions();
+}
+
+function getFilters() {
+  const q = new URLSearchParams();
+  q.set("from", el("filterFrom").value);
+  q.set("to", el("filterTo").value);
+  q.set("typeId", el("filterType").value || 0);
+  q.set("categoryId", el("filterCategory").value || 0);
+  q.set("keyword", el("filterKeyword").value || "");
+  q.set("page", transactionCurrentPage || 1);
+  q.set("pageSize", transactionPageSize || 10);
+  return q.toString();
+}
+
+async function loadTransactions(resetPage) {
+  const fromDate = el("filterFrom") ? el("filterFrom").value : "";
+  const toDate = el("filterTo") ? el("filterTo").value : "";
+
+  if (!isDateRangeValid(fromDate, toDate, true)) {
+    showDateError("Ngày đến không được trước ngày bắt đầu.");
+    return;
+  }
+
+  if (resetPage === true) {
+    transactionCurrentPage = 1;
+  }
+
+  const select = el("transactionPageSize");
+  if (select) {
+    transactionPageSize = Number(select.value || transactionPageSize || 10);
+  }
+
+  const res = await api("transactions.ashx?" + getFilters());
+  renderTransactions(res.data || []);
+  updateTransactionPagination({
+    page: res.page || transactionCurrentPage,
+    pageSize: res.pageSize || transactionPageSize,
+    totalRows: res.totalRows || 0,
+    totalPages: res.totalPages || 1
+  });
+  await loadStatistics();
+}
+
+function renderTransactions(rows) {
+  el("transactionTable").innerHTML = table(["Ngày","Loại","Danh mục","Số tiền","Ghi chú",""], rows.map(r => [
+    formatDate(r.TransactionDate),
+    typeBadge(r),
+    r.CategoryName,
+    signedAmount(r),
+    r.Note || "",
+    `<button onclick='editTransaction(${JSON.stringify(r)})'>Sửa</button>
+     <button class="danger" onclick="deleteTransaction(${r.TransactionId})">Xóa</button>`
+  ]));
+}
+
+function table(headers, rows) {
+  return `<table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join("")}</tr></thead>
+  <tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+
+async function saveTransaction() {
+  const data = {
+    transactionId: Number(el("transactionId").value || 0),
+    transactionDate: el("transactionDate").value,
+    typeId: Number(el("transactionType").value),
+    categoryId: Number(el("transactionCategory").value),
+    amount: Number(el("transactionAmount").value),
+    note: el("transactionNote").value
+  };
+
+  if (!data.transactionDate || !data.typeId || !data.categoryId || data.amount <= 0) {
+    alert("Vui lòng nhập đủ ngày, loại, danh mục và số tiền > 0.");
+    return;
+  }
+
+  data.action = "save";
+
+  try {
+    await api("transactions.ashx", {
+      method: "POST",
+      body: JSON.stringify(data)
+    });
+    clearTransactionForm();
+    await loadTransactions();
+  } catch (e) {
+    alert(e.message || "Không lưu được giao dịch.");
+  }
+}
+
+function editTransaction(r) {
+  el("transactionId").value = r.TransactionId;
+  el("transactionDate").value = formatDate(r.TransactionDate);
+  el("transactionType").value = r.TypeId;
+  fillCategorySelect("transactionCategory", r.TypeId);
+  el("transactionCategory").value = r.CategoryId;
+  el("transactionAmount").value = r.Amount;
+  el("transactionNote").value = r.Note || "";
+  window.scrollTo(0,0);
+}
+
+async function deleteTransaction(id) {
+  if (!confirm("Xóa giao dịch này?")) return;
+  await api("transactions.ashx", {
+    method: "POST",
+    body: JSON.stringify({ action: "delete", transactionId: id })
+  });
+  await loadTransactions();
+}
+
+function clearTransactionForm() {
+  el("transactionId").value = "";
+  el("transactionDate").value = today();
+  el("transactionAmount").value = "";
+  el("transactionNote").value = "";
+}
+
+function resetFilters() {
+  el("filterFrom").value = "";
+  el("filterTo").value = "";
+  el("filterType").value = "0";
+  fillCategorySelect("filterCategory", "", true);
+  el("filterKeyword").value = "";
+  transactionCurrentPage = 1;
+  loadTransactions();
+}
+
+
+function setChartPeriod(period) {
+  currentChartPeriod = period;
+  document.querySelectorAll(".period").forEach(b => b.classList.remove("active"));
+  const btn = el("btnPeriod" + period.charAt(0).toUpperCase() + period.slice(1));
+  if (btn) btn.classList.add("active");
+  loadStatistics();
+}
+
+function statisticsQuery() {
+  const q = new URLSearchParams(getFilters());
+  q.set("period", currentChartPeriod);
+  return q.toString();
+}
+
+async function loadStatistics() {
+  try {
+    const res = await api("statistics.ashx?" + statisticsQuery());
+    const income = Number(res.summary.totalIncome || 0);
+    const expense = Number(res.summary.totalExpense || 0);
+    const saving = Number(res.summary.totalSaving || 0);
+    const balance = Number(res.summary.balance || 0);
+
+    el("totalIncome").innerHTML = '<span class="text-income">+ ' + money(income) + '</span>';
+    el("totalExpense").innerHTML = '<span class="text-expense">- ' + money(expense) + '</span>';
+    el("totalSaving").innerHTML = '<span class="text-saving">◇ ' + money(saving) + '</span>';
+    el("balance").innerHTML = balance >= 0
+      ? '<span class="text-income">+ ' + money(balance) + '</span>'
+      : '<span class="text-expense">- ' + money(Math.abs(balance)) + '</span>';
+
+    const incomeCard = el("totalIncome").closest(".card");
+    const expenseCard = el("totalExpense").closest(".card");
+    const savingCard = el("totalSaving").closest(".card");
+    const balanceCard = el("balance").closest(".card");
+    incomeCard.classList.add("card-income");
+    expenseCard.classList.add("card-expense");
+    savingCard.classList.add("card-saving");
+    balanceCard.classList.remove("card-balance-positive", "card-balance-negative");
+    balanceCard.classList.add(balance >= 0 ? "card-balance-positive" : "card-balance-negative");
+
+    drawPieChart("expensePieChart", res.expenseByCategory || [], "Chi tiêu theo danh mục", "expense");
+    drawPieChart("incomePieChart", res.incomeByCategory || [], "Thu nhập theo danh mục", "income");
+    drawPieChart("savingPieChart", res.savingByCategory || [], "Tiết kiệm theo danh mục", "saving");
+    drawPeriodChart("monthChart", res.byPeriod || [], currentChartPeriod);
+  } catch (e) {
+    el("totalIncome").innerText = "Lỗi";
+    el("totalExpense").innerText = "Lỗi";
+    if (el("totalSaving")) el("totalSaving").innerText = "Lỗi";
+    el("balance").innerText = "Lỗi";
+    drawText("expensePieChart", "Không tải được dữ liệu thống kê: " + e.message);
+    drawText("incomePieChart", "Không tải được dữ liệu thống kê: " + e.message);
+    drawText("savingPieChart", "Không tải được dữ liệu thống kê: " + e.message);
+    drawText("monthChart", "Không tải được dữ liệu thống kê: " + e.message);
+  }
+}
+
+function drawText(canvasId, text) {
+  const canvas = el(canvasId), ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.font = "16px Arial";
+  ctx.fillText(text, 20, 40);
+}
+
+function pieColors(mode) {
+  if (mode === "income") return ["#16a34a", "#22c55e", "#86efac", "#15803d", "#bbf7d0", "#4ade80"];
+  if (mode === "saving") return ["#2563eb", "#60a5fa", "#93c5fd", "#1d4ed8", "#bfdbfe", "#3b82f6"];
+  return ["#dc2626", "#ef4444", "#fca5a5", "#b91c1c", "#fecaca", "#f87171"];
+}
+
+function drawPieChart(canvasId, rows, title, mode) {
+  const canvas = el(canvasId), ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.font = "16px Arial";
+  ctx.fillStyle = "#111827";
+  ctx.fillText(title, 20, 28);
+
+  const total = rows.reduce((s, r) => s + Number(r.TotalAmount || 0), 0);
+  if (!rows.length || total <= 0) {
+    ctx.fillStyle = "#64748b";
+    ctx.fillText("Không có dữ liệu", 20, 70);
+    return;
+  }
+
+  const colors = pieColors(mode);
+  const cx = 150;
+  const cy = 175;
+  const radius = 105;
+  let startAngle = -Math.PI / 2;
+
+  rows.forEach((r, i) => {
+    const value = Number(r.TotalAmount || 0);
+    const angle = value / total * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, startAngle, startAngle + angle);
+    ctx.closePath();
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+    startAngle += angle;
+  });
+
+  let legendX = 300;
+  let legendY = 70;
+  ctx.font = "14px Arial";
+  rows.forEach((r, i) => {
+    const value = Number(r.TotalAmount || 0);
+    const pct = total ? value / total * 100 : 0;
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillRect(legendX, legendY - 12, 14, 14);
+    ctx.fillStyle = "#111827";
+    ctx.fillText(
+      String(r.CategoryName).substring(0, 18) + ": " + pct.toFixed(1) + "% (" + money(value) + ")",
+      legendX + 22,
+      legendY
+    );
+    legendY += 24;
+  });
+}
+
+
+function drawPeriodChart(canvasId, rows, period) {
+  const canvas = el(canvasId), ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const title = period === "day"
+    ? "Thu / Chi / Tiết kiệm theo 7 ngày gần nhất"
+    : period === "year"
+      ? "Thu / Chi / Tiết kiệm theo 3 năm gần nhất"
+      : "Thu / Chi / Tiết kiệm theo 12 tháng gần nhất";
+
+  const titleNode = el("periodChartTitle");
+  if (titleNode) titleNode.innerText = title;
+
+  ctx.font = "16px Arial";
+  ctx.fillStyle = "#111827";
+  ctx.fillText(title, 20, 28);
+
+  ctx.font = "14px Arial";
+  ctx.fillStyle = "#16a34a";
+  ctx.fillRect(20, 44, 14, 14);
+  ctx.fillStyle = "#111827";
+  ctx.fillText("Thu nhập", 40, 56);
+
+  ctx.fillStyle = "#dc2626";
+  ctx.fillRect(130, 44, 14, 14);
+  ctx.fillStyle = "#111827";
+  ctx.fillText("Chi tiêu", 150, 56);
+
+  ctx.fillStyle = "#2563eb";
+  ctx.fillRect(230, 44, 14, 14);
+  ctx.fillStyle = "#111827";
+  ctx.fillText("Tiết kiệm", 250, 56);
+
+  if (!rows.length) {
+    ctx.fillStyle = "#64748b";
+    ctx.fillText("Không có dữ liệu", 20, 90);
+    return;
+  }
+
+  const max = Math.max(1, ...rows.flatMap(r => [
+    Number(r.IncomeAmount || 0),
+    Number(r.ExpenseAmount || 0),
+    Number(r.SavingAmount || 0)
+  ]));
+  const groupW = Math.max(45, (canvas.width - 90) / rows.length - 10);
+  const barW = Math.max(8, groupW / 3 - 3);
+
+  rows.forEach((r,i) => {
+    const x = 45 + i * (groupW + 10);
+    const inc = Number(r.IncomeAmount || 0);
+    const exp = Number(r.ExpenseAmount || 0);
+    const sav = Number(r.SavingAmount || 0);
+    const incH = inc / max * 180;
+    const expH = exp / max * 180;
+    const savH = sav / max * 180;
+
+    ctx.fillStyle = "#16a34a";
+    ctx.fillRect(x, 270 - incH, barW, incH);
+
+    ctx.fillStyle = "#dc2626";
+    ctx.fillRect(x + barW + 3, 270 - expH, barW, expH);
+
+    ctx.fillStyle = "#2563eb";
+    ctx.fillRect(x + (barW + 3) * 2, 270 - savH, barW, savH);
+
+    ctx.fillStyle = "#111827";
+    ctx.font = "12px Arial";
+    const label = r.PeriodLabel || r.PeriodKey || "";
+    ctx.save();
+    ctx.translate(x, 292);
+    if (period === "month") ctx.rotate(-0.45);
+    ctx.fillText(label, 0, 0);
+    ctx.restore();
+
+    if (period === "year") {
+      ctx.fillStyle = "#16a34a";
+      ctx.fillText(money(inc), x, Math.max(78, 270 - incH - 6));
+      ctx.fillStyle = "#dc2626";
+      ctx.fillText(money(exp), x + barW + 3, Math.max(92, 270 - expH - 6));
+      ctx.fillStyle = "#2563eb";
+      ctx.fillText(money(sav), x + (barW + 3) * 2, Math.max(106, 270 - savH - 6));
     }
+  });
+}
 
-    .login-page {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 28px;
-      background: #eef4ff;
-      background-image: linear-gradient(135deg, rgba(37,99,235,.10), rgba(22,163,74,.08), rgba(248,250,252,.95));
-      box-sizing: border-box;
+function renderCategories() {
+  el("categoryTable").innerHTML = table(["Loại","Danh mục","Hoạt động",""], categories.map(c => [
+    c.TypeName, c.CategoryName, c.IsActive ? "Có" : "Không",
+    `<button onclick='editCategory(${JSON.stringify(c)})'>Sửa</button>
+     <button class="danger" onclick="deleteCategory(${c.CategoryId})">Xóa</button>`
+  ]));
+}
+
+async function saveCategory() {
+  const data = {
+    categoryId: Number(el("categoryId").value || 0),
+    typeId: Number(el("categoryType").value),
+    categoryName: el("categoryName").value,
+    isActive: Number(el("categoryActive").value)
+  };
+  data.action = "save";
+  await api("categories.ashx", { method: "POST", body: JSON.stringify(data) });
+  clearCategoryForm();
+  await loadCategories();
+  fillAllSelects();
+}
+
+function editCategory(c) {
+  el("categoryId").value = c.CategoryId;
+  el("categoryType").value = c.TypeId;
+  el("categoryName").value = c.CategoryName;
+  el("categoryActive").value = c.IsActive ? "1" : "0";
+}
+
+async function deleteCategory(id) {
+  if (!confirm("Xóa danh mục này?")) return;
+  await api("categories.ashx", {
+    method: "POST",
+    body: JSON.stringify({ action: "delete", categoryId: id })
+  });
+  await loadCategories();
+  fillAllSelects();
+}
+
+function clearCategoryForm() {
+  el("categoryId").value = "";
+  el("categoryName").value = "";
+  el("categoryActive").value = "1";
+}
+
+function renderTypes() {
+  el("typeTable").innerHTML = table(["Mã","Tên",""], types.map(t => [
+    t.TypeCode, t.TypeName,
+    `<button onclick='editType(${JSON.stringify(t)})'>Sửa</button>
+     <button class="danger" onclick="deleteType(${t.TypeId})">Xóa</button>`
+  ]));
+}
+
+async function saveType() {
+  const data = {
+    typeId: Number(el("typeId").value || 0),
+    typeCode: el("typeCode").value,
+    typeName: el("typeName").value
+  };
+  data.action = "save";
+  await api("transactionTypes.ashx", { method: "POST", body: JSON.stringify(data) });
+  clearTypeForm();
+  await loadTypes();
+  fillAllSelects();
+}
+
+function editType(t) {
+  el("typeId").value = t.TypeId;
+  el("typeCode").value = t.TypeCode;
+  el("typeName").value = t.TypeName;
+}
+
+async function deleteType(id) {
+  if (!confirm("Xóa loại này?")) return;
+  await api("transactionTypes.ashx", {
+    method: "POST",
+    body: JSON.stringify({ action: "delete", typeId: id })
+  });
+  await loadTypes();
+  fillAllSelects();
+}
+
+function clearTypeForm() {
+  el("typeId").value = "";
+  el("typeCode").value = "";
+  el("typeName").value = "";
+}
+
+async function loadUsers() {
+  if (!isCurrentUserAdmin()) return;
+
+  const res = await api("users.ashx");
+  el("userTable").innerHTML = table(["Tài khoản","Họ tên","Hoạt động","Phân quyền",""], res.data.map(u => [
+    u.Username,
+    u.FullName || "",
+    u.IsActive ? "Có" : "Không",
+    u.IsAdmin ? '<span class="role-badge role-admin">Admin</span>' : '<span class="role-badge role-user">User thường</span>',
+    `<button onclick='editUser(${JSON.stringify(u)})'>Sửa</button>
+     <button class="danger" onclick="deleteUser(${u.UserId})">Xóa</button>`
+  ]));
+}
+
+async function saveUser() {
+  const data = {
+    userId: Number(el("userId").value || 0),
+    username: el("username").value,
+    fullName: el("fullName").value,
+    password: el("password").value,
+    isActive: Number(el("userActive").value),
+    isAdmin: Number(el("userRole") ? el("userRole").value : 0)
+  };
+  data.action = "save";
+  await api("users.ashx", { method: "POST", body: JSON.stringify(data) });
+  clearUserForm();
+  await loadUsers();
+}
+
+function editUser(u) {
+  el("userId").value = u.UserId;
+  el("username").value = u.Username;
+  el("fullName").value = u.FullName || "";
+  el("password").value = "";
+  el("userActive").value = u.IsActive ? "1" : "0";
+  if (el("userRole")) el("userRole").value = u.IsAdmin ? "1" : "0";
+}
+
+async function deleteUser(id) {
+  if (!confirm("Xóa user này?")) return;
+  await api("users.ashx", {
+    method: "POST",
+    body: JSON.stringify({ action: "delete", userId: id })
+  });
+  if (isCurrentUserAdmin()) await loadUsers();
+  applyUserPermissions();
+}
+
+function clearUserForm() {
+  el("userId").value = "";
+  el("username").value = "";
+  el("fullName").value = "";
+  el("password").value = "";
+  el("userActive").value = "1";
+  if (el("userRole")) el("userRole").value = "0";
+}
+
+async function loadSavingsGoals() {
+  try {
+    const res = await api("savingsGoals.ashx");
+    renderSavingsDashboard(res);
+    renderSavingsGoals(res.data || []);
+  } catch (e) {
+    if (el("budgetAlerts")) el("budgetAlerts").innerHTML = '<div class="alert alert-danger">Không tải được kế hoạch tiết kiệm: ' + e.message + '</div>';
+  }
+}
+
+function renderSavingsDashboard(res) {
+  const summary = res.summary || {};
+  const income = Number(summary.monthIncome || 0);
+  const expense = Number(summary.monthExpense || 0);
+  const saving = Number(summary.monthSaving || 0);
+  const balance = Number(summary.monthBalance || 0);
+
+  if (el("goalMonthIncome")) el("goalMonthIncome").innerHTML = '<span class="text-income">+ ' + money(income) + '</span>';
+  if (el("goalMonthExpense")) el("goalMonthExpense").innerHTML = '<span class="text-expense">- ' + money(expense) + '</span>';
+  if (el("goalMonthSaving")) el("goalMonthSaving").innerHTML = '<span class="text-saving">◇ ' + money(saving) + '</span>';
+  if (el("goalMonthBalance")) el("goalMonthBalance").innerHTML = balance >= 0
+    ? '<span class="text-income">+ ' + money(balance) + '</span>'
+    : '<span class="text-expense">- ' + money(Math.abs(balance)) + '</span>';
+
+  const alerts = res.alerts || [];
+  const recommendations = res.recommendations || [];
+
+  el("budgetAlerts").innerHTML = alerts.length
+    ? alerts.map(a => '<div class="alert ' + (a.level === "danger" ? "alert-danger" : "alert-warning") + '">' + a.message + '</div>').join("")
+    : '<div class="alert alert-ok">Chưa có cảnh báo ngân sách trong tháng này.</div>';
+
+  el("savingRecommendations").innerHTML = recommendations.length
+    ? recommendations.map(r => '<div class="recommendation-item">' + r + '</div>').join("")
+    : '<div class="recommendation-item">Chưa đủ dữ liệu để đưa ra gợi ý tiết kiệm.</div>';
+}
+
+function renderSavingsGoals(rows) {
+  el("savingsGoalTable").innerHTML = table(
+    ["Mục tiêu", "Thời gian", "Mục tiêu", "Đã tiết kiệm", "Còn thiếu", "Tiến độ", "Ngân sách/tháng", "Trạng thái", ""],
+    rows.map(g => [
+      g.GoalName,
+      formatDate(g.StartDate) + " → " + formatDate(g.TargetDate),
+      money(g.TargetAmount),
+      money(g.SavedAmount),
+      money(g.RemainingAmount),
+      '<div class="progress-wrap"><div class="progress-bar" style="width:' + Math.min(100, Number(g.ProgressPercent || 0)) + '%"></div></div><div class="progress-text">' + Number(g.ProgressPercent || 0).toFixed(1) + '%</div>',
+      money(g.MonthlyBudget),
+      g.IsActive ? "Đang theo dõi" : "Tạm dừng",
+      `<button onclick='editSavingsGoal(${JSON.stringify(g)})'>Sửa</button>
+       <button class="danger" onclick="deleteSavingsGoal(${g.GoalId})">Xóa</button>`
+    ])
+  );
+}
+
+async function saveSavingsGoal() {
+  const data = {
+    action: "save",
+    goalId: Number(el("goalId").value || 0),
+    goalName: el("goalName").value,
+    targetAmount: Number(el("goalTargetAmount").value),
+    monthlyBudget: Number(el("goalMonthlyBudget").value),
+    startDate: el("goalStartDate").value,
+    targetDate: el("goalTargetDate").value,
+    isActive: Number(el("goalActive").value)
+  };
+
+  if (!data.goalName || data.targetAmount <= 0 || data.monthlyBudget <= 0 || !data.startDate || !data.targetDate) {
+    showDateError("Vui lòng nhập đủ tên mục tiêu, số tiền mục tiêu, ngân sách tháng, ngày bắt đầu và ngày đạt mục tiêu.");
+    return;
+  }
+
+  if (!isDateRangeValid(data.startDate, data.targetDate, false)) {
+    showDateError("Ngày đạt mục tiêu phải sau ngày bắt đầu.");
+    return;
+  }
+
+  await api("savingsGoals.ashx", {
+    method: "POST",
+    body: JSON.stringify(data)
+  });
+
+  clearSavingsGoalForm();
+  await loadSavingsGoals();
+}
+
+function editSavingsGoal(g) {
+  el("goalId").value = g.GoalId;
+  el("goalName").value = g.GoalName;
+  el("goalTargetAmount").value = Number(g.TargetAmount || 0);
+  el("goalMonthlyBudget").value = Number(g.MonthlyBudget || 0);
+  el("goalStartDate").value = formatDate(g.StartDate);
+  el("goalTargetDate").value = formatDate(g.TargetDate);
+  el("goalActive").value = g.IsActive ? "1" : "0";
+  window.scrollTo(0,0);
+}
+
+async function deleteSavingsGoal(id) {
+  if (!confirm("Xóa mục tiêu tiết kiệm này?")) return;
+
+  await api("savingsGoals.ashx", {
+    method: "POST",
+    body: JSON.stringify({ action: "delete", goalId: id })
+  });
+
+  await loadSavingsGoals();
+}
+
+function clearSavingsGoalForm() {
+  el("goalId").value = "";
+  el("goalName").value = "";
+  el("goalTargetAmount").value = "";
+  el("goalMonthlyBudget").value = "";
+  el("goalStartDate").value = today();
+  el("goalTargetDate").value = addMonths(today(), 12);
+  el("goalActive").value = "1";
+}
+
+
+(async function checkLogin() {
+  try {
+    const res = await api("me.ashx");
+    if (res.ok) {
+      currentUser = res.user || null;
+      el("loginView").classList.add("hidden");
+      el("appView").classList.remove("hidden");
+      applyUserPermissions();
+      await initData();
     }
-
-    .login-shell {
-      width: 100%;
-      max-width: 1080px;
-      display: grid;
-      grid-template-columns: 1.15fr .85fr;
-      background: #fff;
-      border: 1px solid #dbe4f0;
-      border-radius: 22px;
-      box-shadow: 0 18px 45px rgba(15,23,42,.16);
-      overflow: hidden;
-    }
-
-    .login-intro {
-      padding: 42px;
-      background: linear-gradient(145deg, #0f172a 0%, #1e3a8a 55%, #14532d 100%);
-      color: #fff;
-    }
-
-    .brand-row {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 34px;
-    }
-
-    .brand-mark {
-      width: 58px;
-      height: 58px;
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #fff;
-      color: #1d4ed8;
-      font-weight: 900;
-      font-size: 22px;
-      letter-spacing: 1px;
-      box-shadow: 0 10px 25px rgba(0,0,0,.18);
-    }
-
-    .brand-title {
-      font-size: 20px;
-      font-weight: 800;
-      line-height: 1.2;
-    }
-
-    .brand-subtitle {
-      margin-top: 4px;
-      font-size: 13px;
-      color: #dbeafe;
-    }
-
-    .login-intro h1 {
-      margin: 0;
-      font-size: 36px;
-      line-height: 1.15;
-      letter-spacing: -.4px;
-    }
-
-    .intro-text {
-      margin: 16px 0 28px;
-      color: #e0f2fe;
-      font-size: 16px;
-      line-height: 1.65;
-    }
-
-    .topic-panel {
-      background: rgba(255,255,255,.11);
-      border: 1px solid rgba(255,255,255,.20);
-      border-radius: 16px;
-      padding: 16px;
-    }
-
-    .topic-row {
-      display: grid;
-      grid-template-columns: 110px 1fr;
-      gap: 14px;
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(255,255,255,.14);
-      font-size: 14px;
-    }
-
-    .topic-row:last-child {
-      border-bottom: 0;
-    }
-
-    .topic-row span {
-      color: #bfdbfe;
-    }
-
-    .topic-row strong {
-      color: #fff;
-      font-weight: 700;
-    }
-
-    .login-card {
-      padding: 42px 38px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      background: #fff;
-      box-sizing: border-box;
-    }
-
-    .login-card-header {
-      margin-bottom: 24px;
-    }
-
-    .login-card-header h2 {
-      margin: 0;
-      font-size: 26px;
-      color: #0f172a;
-    }
-
-    .login-card-header p {
-      margin: 8px 0 0;
-      color: #64748b;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-
-    .login-form {
-      display: grid;
-      gap: 10px;
-    }
-
-    .login-form label {
-      margin-top: 6px;
-      color: #334155;
-      font-size: 14px;
-      font-weight: 700;
-    }
-
-    .login-form input {
-      width: 100%;
-      height: 44px;
-      border: 1px solid #cbd5e1;
-      border-radius: 10px;
-      padding: 0 13px;
-      background: #f8fafc;
-      color: #0f172a;
-      font-size: 15px;
-      box-sizing: border-box;
-      outline: none;
-    }
-
-    .login-form input:focus {
-      background: #fff;
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37,99,235,.16);
-    }
-
-    .login-button {
-      width: 100%;
-      height: 46px;
-      margin-top: 14px;
-      border: 0;
-      border-radius: 10px;
-      background: #2563eb;
-      color: #fff;
-      font-weight: 800;
-      font-size: 15px;
-      cursor: pointer;
-      box-shadow: 0 10px 22px rgba(37,99,235,.22);
-    }
-
-    .login-button:hover {
-      background: #1d4ed8;
-    }
-
-    .login-note {
-      margin-top: 18px;
-      padding: 12px 14px;
-      border-radius: 10px;
-      background: #f1f5f9;
-      color: #475569;
-      font-size: 13px;
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-    }
-
-    .login-note strong {
-      color: #0f172a;
-    }
-
-    #loginMessage.message,
-    .login-form .message {
-      min-height: 20px;
-      color: #dc2626;
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    @media (max-width: 920px) {
-      .login-shell {
-        grid-template-columns: 1fr;
-        max-width: 620px;
-      }
-
-      .login-intro {
-        padding: 30px;
-      }
-
-      .login-intro h1 {
-        font-size: 30px;
-      }
-
-      .login-card {
-        padding: 30px;
-      }
-    }
-
-    @media (max-width: 560px) {
-      .login-page {
-        padding: 14px;
-      }
-
-      .login-intro,
-      .login-card {
-        padding: 22px;
-      }
-
-      .topic-row {
-        grid-template-columns: 1fr;
-        gap: 4px;
-      }
-
-      .login-note {
-        display: block;
-      }
-
-      .login-note strong {
-        display: block;
-        margin-top: 4px;
-      }
-    }
-  </style>
-
-</head>
-<body>
-  <div id="loginView" class="login-page">
-    <div class="login-shell">
-      <div class="login-intro">
-        <div class="brand-row">
-          <div class="brand-mark">PF</div>
-          <div>
-            <div class="brand-title">Personal Finance</div>
-            <div class="brand-subtitle">Quản lý thu nhập, chi tiêu và tiết kiệm</div>
-          </div>
-        </div>
-
-        <h1>Ứng dụng quản lý chi tiêu</h1>
-        <p class="intro-text">
-          Ghi nhận giao dịch hằng ngày, phân loại thu chi, theo dõi tiết kiệm và xem thống kê trực quan.
-        </p>
-
-        <div class="topic-panel">
-          <div class="topic-row">
-            <span>Đề tài</span>
-            <strong>Ứng dụng quản lý chi tiêu</strong>
-          </div>
-          <div class="topic-row">
-            <span>GVHD</span>
-            <strong>TS Đoàn Phước Miền</strong>
-          </div>
-          <div class="topic-row">
-            <span>Lớp</span>
-            <strong>DK24TT80171</strong>
-          </div>
-          <div class="topic-row">
-            <span>Họ và tên</span>
-            <strong>Tôn Thất Khoa</strong>
-          </div>
-          <div class="topic-row">
-            <span>MSSV</span>
-            <strong>170124890</strong>
-          </div>
-        </div>
-      </div>
-
-      <div class="login-card">
-        <div class="login-card-header">
-          <h2>Đăng nhập hệ thống</h2>
-          <p>Sử dụng tài khoản được cấp để vào trang quản lý.</p>
-        </div>
-
-        <div class="login-form">
-          <label for="loginUsername">Tên đăng nhập</label>
-          <input id="loginUsername" type="text" value="admin" autocomplete="username" />
-
-          <label for="loginPassword">Mật khẩu</label>
-          <input id="loginPassword" type="password" value="admin123" autocomplete="current-password" />
-
-          <button class="login-button" onclick="login()">Đăng nhập</button>
-          <div id="loginMessage" class="message"></div>
-        </div>
-
-        <div class="login-note">
-          <span>Tài khoản mặc định:</span>
-          <strong>admin / admin123</strong>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="appView" class="app hidden">
-    <aside>
-      <h2>Thu chi</h2>
-      <button class="nav active" onclick="showTab('transactions')">Giao dịch</button>
-      <button class="nav" onclick="showTab('savingsGoals')">Kế hoạch tiết kiệm</button>
-      <button id="navCategories" class="nav admin-only" onclick="showTab('categories')">Danh mục</button>
-      <button id="navTypes" class="nav admin-only" onclick="showTab('types')">Loại thu/chi</button>
-      <button id="navUsers" class="nav admin-only" onclick="showTab('users')">User</button>
-      <button class="logout" onclick="logout()">Đăng xuất</button>
-    </aside>
-
-    <main>
-      <section id="transactions" class="tab">
-        <h1>Quản lý giao dịch</h1>
-        <div class="grid form-grid">
-          <input type="hidden" id="transactionId">
-          <label>Ngày<input id="transactionDate" type="date"></label>
-          <label>Loại<select id="transactionType" onchange="fillCategorySelect('transactionCategory', this.value)"></select></label>
-          <label>Danh mục<select id="transactionCategory"></select></label>
-          <label>Số tiền<input id="transactionAmount" type="number" min="0" step="1000"></label>
-          <label>Ghi chú<input id="transactionNote"></label>
-        </div>
-        <div class="actions">
-          <button onclick="saveTransaction()">Lưu</button>
-          <button class="secondary" onclick="clearTransactionForm()">Nhập mới</button>
-        </div>
-
-        <h2>Tìm kiếm, lọc</h2>
-        <div class="grid filter-grid">
-          <label>Từ ngày<input id="filterFrom" type="date"></label>
-          <label>Đến ngày<input id="filterTo" type="date"></label>
-          <label>Loại<select id="filterType" onchange="fillCategorySelect('filterCategory', this.value, true)"></select></label>
-          <label>Danh mục<select id="filterCategory"></select></label>
-          <label>Từ khóa<input id="filterKeyword" placeholder="ghi chú"></label>
-        </div>
-        <div class="actions">
-          <button onclick="loadTransactions(true)">Lọc</button>
-          <button class="secondary" onclick="resetFilters()">Xóa lọc</button>
-        </div>
-
-        <div class="inline-statistics">
-          <h2>Thống kê tài chính</h2>
-          <div class="cards cards-four">
-            <div class="card"><span>Tổng thu</span><strong id="totalIncome">0</strong></div>
-            <div class="card"><span>Tổng chi</span><strong id="totalExpense">0</strong></div>
-            <div class="card"><span>Tổng tiết kiệm</span><strong id="totalSaving">0</strong></div>
-            <div class="card"><span>Số dư khả dụng</span><strong id="balance">0</strong></div>
-          </div>
-
-          <div class="chart-toolbar">
-            <span>Biểu đồ thu / chi:</span>
-            <button id="btnPeriodDay" class="period active" onclick="setChartPeriod('day')">Ngày</button>
-            <button id="btnPeriodMonth" class="period" onclick="setChartPeriod('month')">Tháng</button>
-            <button id="btnPeriodYear" class="period" onclick="setChartPeriod('year')">Năm</button>
-          </div>
-
-          <div class="pie-grid">
-            <div>
-              <h2>Tỷ lệ chi tiêu theo danh mục</h2>
-              <canvas id="expensePieChart" width="520" height="340"></canvas>
-            </div>
-            <div>
-              <h2>Tỷ lệ thu nhập theo danh mục</h2>
-              <canvas id="incomePieChart" width="520" height="340"></canvas>
-            </div>
-          </div>
-
-          <div class="chart-grid">
-            <div>
-              <h2>Tỷ lệ tiết kiệm theo danh mục</h2>
-              <canvas id="savingPieChart" width="760" height="320"></canvas>
-            </div>
-            <div>
-              <h2 id="periodChartTitle">Thu / Chi / Tiết kiệm theo 7 ngày gần nhất</h2>
-              <canvas id="monthChart" width="760" height="320"></canvas>
-            </div>
-          </div>
-        </div>
-
-
-        <div class="pagination-bar">
-          <div class="pagination-left">
-            <label for="transactionPageSize">Hiển thị</label>
-            <select id="transactionPageSize" onchange="changeTransactionPageSize()">
-              <option value="10" selected>10</option>
-              <option value="20">20</option>
-              <option value="50">50</option>
-            </select>
-            <span>giao dịch / trang</span>
-          </div>
-          <div class="pagination-right">
-            <button class="secondary" onclick="goTransactionPage(-1)">Trang trước</button>
-            <span id="transactionPageInfo">Trang 1/1</span>
-            <button class="secondary" onclick="goTransactionPage(1)">Trang sau</button>
-          </div>
-        </div>
-
-        <div id="transactionTable"></div>
-      </section>
-
-
-      <section id="savingsGoals" class="tab hidden">
-        <h1>Lập kế hoạch tiết kiệm</h1>
-        <p class="muted">Đặt mục tiêu tiết kiệm, theo dõi tiến độ, cảnh báo khi vượt ngân sách và xem gợi ý tiết kiệm cơ bản theo dữ liệu tháng hiện tại.</p>
-
-        <div class="grid form-grid">
-          <input type="hidden" id="goalId">
-          <label>Tên mục tiêu<input id="goalName" placeholder="Ví dụ: Mua laptop, Quỹ dự phòng"></label>
-          <label>Số tiền mục tiêu<input id="goalTargetAmount" type="number" min="0" step="100000" placeholder="Ví dụ: 30000000"></label>
-          <label>Ngân sách chi tiêu/tháng<input id="goalMonthlyBudget" type="number" min="0" step="100000" placeholder="Ví dụ: 8000000"></label>
-          <label>Ngày bắt đầu<input id="goalStartDate" type="date"></label>
-          <label>Ngày đạt mục tiêu<input id="goalTargetDate" type="date"></label>
-          <label>Hoạt động<select id="goalActive"><option value="1">Có</option><option value="0">Không</option></select></label>
-        </div>
-
-        <div class="actions">
-          <button onclick="saveSavingsGoal()">Lưu mục tiêu</button>
-          <button class="secondary" onclick="clearSavingsGoalForm()">Nhập mới</button>
-        </div>
-
-        <div class="goal-summary-grid">
-          <div class="card card-income"><span>Thu tháng này</span><strong id="goalMonthIncome">0</strong></div>
-          <div class="card card-expense"><span>Chi tháng này</span><strong id="goalMonthExpense">0</strong></div>
-          <div class="card card-saving"><span>Tiết kiệm tháng này</span><strong id="goalMonthSaving">0</strong></div>
-          <div class="card"><span>Số dư tháng này</span><strong id="goalMonthBalance">0</strong></div>
-        </div>
-
-        <h2>Cảnh báo ngân sách</h2>
-        <div id="budgetAlerts" class="alert-list"></div>
-
-        <h2>Gợi ý tiết kiệm</h2>
-        <div id="savingRecommendations" class="recommendation-list"></div>
-
-        <h2>Danh sách mục tiêu</h2>
-        <div id="savingsGoalTable"></div>
-      </section>
-
-
-      <section id="categories" class="tab hidden admin-only">
-        <h1>Quản lý danh mục</h1>
-        <div class="grid form-grid">
-          <input type="hidden" id="categoryId">
-          <label>Loại<select id="categoryType"></select></label>
-          <label>Tên danh mục<input id="categoryName"></label>
-          <label>Hoạt động<select id="categoryActive"><option value="1">Có</option><option value="0">Không</option></select></label>
-        </div>
-        <div class="actions">
-          <button onclick="saveCategory()">Lưu</button>
-          <button class="secondary" onclick="clearCategoryForm()">Nhập mới</button>
-        </div>
-        <div id="categoryTable"></div>
-      </section>
-
-      <section id="types" class="tab hidden admin-only">
-        <h1>Quản lý loại thu/chi</h1>
-        <div class="grid form-grid">
-          <input type="hidden" id="typeId">
-          <label>Mã loại<input id="typeCode" placeholder="Income hoặc Expense"></label>
-          <label>Tên loại<input id="typeName"></label>
-        </div>
-        <div class="actions">
-          <button onclick="saveType()">Lưu</button>
-          <button class="secondary" onclick="clearTypeForm()">Nhập mới</button>
-        </div>
-        <div id="typeTable"></div>
-      </section>
-
-      <section id="users" class="tab hidden admin-only">
-        <h1>Quản lý user</h1>
-        <div class="grid form-grid">
-          <input type="hidden" id="userId">
-          <label>Tài khoản<input id="username"></label>
-          <label>Họ tên<input id="fullName"></label>
-          <label>Mật khẩu<input id="password" type="password" placeholder="để trống nếu không đổi"></label>
-          <label>Hoạt động<select id="userActive"><option value="1">Có</option><option value="0">Không</option></select></label>
-          <label>Phân quyền
-            <select id="userRole">
-              <option value="0">User thường</option>
-              <option value="1">Admin</option>
-            </select>
-          </label>
-        </div>
-        <div class="actions">
-          <button onclick="saveUser()">Lưu</button>
-          <button class="secondary" onclick="clearUserForm()">Nhập mới</button>
-        </div>
-        <div id="userTable"></div>
-      </section>
-    </main>
-  </div>
-
-  
-    <footer class="app-footer">
-      <div>Đề tài: ứng dụng quản lý chi tiêu | GVHD: TS Đoàn Phước Miền | Lớp: DK24TT80171 | Họ và tên: Tôn Thất Khoa | MSSV: 170124890</div>
-    </footer>
-
-<script src="assets/app.js"></script>
-</body>
-</html>
+  } catch(e) {}
+})();

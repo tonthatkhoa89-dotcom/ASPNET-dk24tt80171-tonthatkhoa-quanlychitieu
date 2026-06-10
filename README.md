@@ -132,7 +132,7 @@ Repository
       <td>Hoàn tất</td>
       <td>
         Sau khi script hoàn tất, truy cập:<br>
-        <code>http://localhost/PersonalFinanceOffline/frontend/index.html</code>
+        <code>http://localhost/frontend/index.html</code>
       </td>
     </tr>
   </tbody>
@@ -185,7 +185,7 @@ iisreset
 Truy cập:
 
 ```text
-http://localhost/PersonalFinanceOffline/frontend/index.html
+http://localhost/frontend/index.html
 ```
 
 ---
